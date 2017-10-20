@@ -1,17 +1,41 @@
 #include <usloss.h>
+#include <usyscall.h>
 #include <phase1.h>
 #include <phase2.h>
 #include <phase3.h>
 #include <phase4.h>
 #include <stdlib.h>
+#include "devices.h"
+
+// Debugging flag
+int debugflag4 = 0;
 
 semaphore 	running;
 
 static int	ClockDriver(char *);
 static int	DiskDriver(char *);
 
+void diskRead();
+void diskWrite();
+void diskSize();
+void termRead();
+void termWrite();
+
+void diskReadReal();
+void diskWriteReal();
+void diskSizeReal();
+void termReadReal();
+void termWriteReal();
+
+process ProcTable[MAXPROC];
+
 void start3(void)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("start3(): started");
+    }
+
     char	name[128];
     char        termbuf[10];
     int		i;
@@ -22,8 +46,23 @@ void start3(void)
     // Check kernel mode
     checkMode("start3");
 
+    // Initialize the system call vector
+    systemCallVec[SYS_SLEEP] = sleep;
+    systemCallVec[SYS_DISKREAD] = diskRead;
+    systemCallVec[SYS_DISKWRITE] = diskWrite;
+    systemCallVec[SYS_DISKSIZE] = diskSize;
+    systemCallVec[SYS_TERMREAD] = termRead;
+    systemCallVec[SYS_TERMWRITE] = termWrite;
+
+
+    // Initialize the ProcTable
+    for (int i = 0; i < MAXPROC; i++)
+    {
+        ProcTable[i].pid = EMPTY;
+    }
+
     /*
-     * Create clock device driver 
+     * Create clock device driver
      * I am assuming a semaphore here for coordination.  A mailbox can
      * be used instead -- your choice.
      */
@@ -31,8 +70,8 @@ void start3(void)
     clockPID = fork1("Clock driver", ClockDriver, NULL, USLOSS_MIN_STACK, 2);
     if (clockPID < 0)
     {
-	USLOSS_Console("start3(): Can't create clock driver\n");
-	USLOSS_Halt(1);
+	       USLOSS_Console("start3(): Can't create clock driver\n");
+	       USLOSS_Halt(1);
     }
     /*
      * Wait for the clock driver to start. The idea is that ClockDriver
@@ -80,7 +119,7 @@ void start3(void)
 
     // eventually, at the end:
     quit(0);
-    
+
 }
 
 static int
