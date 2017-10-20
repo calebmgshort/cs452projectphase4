@@ -3,15 +3,14 @@
 #include <phase2.h>
 #include <phase3.h>
 #include <phase4.h>
-#include <stdlib.h> /* needed for atoi() */
+#include <stdlib.h>
 
 semaphore 	running;
 
 static int	ClockDriver(char *);
 static int	DiskDriver(char *);
 
-void
-start3(void)
+void start3(void)
 {
     char	name[128];
     char        termbuf[10];
@@ -19,9 +18,9 @@ start3(void)
     int		clockPID;
     int		pid;
     int		status;
-    /*
-     * Check kernel mode here.
-     */
+
+    // Check kernel mode
+    checkMode("start3");
 
     /*
      * Create clock device driver 
@@ -30,7 +29,8 @@ start3(void)
      */
     running = semcreateReal(0);
     clockPID = fork1("Clock driver", ClockDriver, NULL, USLOSS_MIN_STACK, 2);
-    if (clockPID < 0) {
+    if (clockPID < 0)
+    {
 	USLOSS_Console("start3(): Can't create clock driver\n");
 	USLOSS_Halt(1);
     }
