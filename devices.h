@@ -9,6 +9,7 @@ typedef struct process * processPtr;
 struct process
 {
     int pid;                          // The pid of this process
+    int privateMboxID;                // The id of the private mailbox used to block this process
 };
 
 #define EMPTY -1;

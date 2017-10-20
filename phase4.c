@@ -58,11 +58,11 @@ int start3(char *args)
     systemCallVec[SYS_TERMREAD] = termRead;
     systemCallVec[SYS_TERMWRITE] = termWrite;
 
-
     // Initialize the ProcTable
     for (int i = 0; i < MAXPROC; i++)
     {
         ProcTable[i].pid = EMPTY;
+        ProcTable[i].privateMboxID = MboxCreate(0, MAX_MESSAGE);
     }
 
     /*
@@ -197,4 +197,5 @@ int sleepReal(int secs)
 {
     // Put an entry in the clock driver queue
     // Block this process
+    blockOnMbox();
 }

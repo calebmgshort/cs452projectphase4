@@ -36,3 +36,13 @@ void setToUserMode()
         USLOSS_Halt(1);
     }
 }
+
+/*
+ * Blocks the current process by receiving from its private mailbox.
+ */
+void blockOnMbox()
+{
+    processPtr proc = ProcTable[getpid() % MAXPROC];
+    MboxReceive(proc->privateMboxID, NULL, 0);
+}
+

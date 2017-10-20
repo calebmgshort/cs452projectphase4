@@ -3,5 +3,5 @@
 
 extern void checkMode(char *);
 extern void setToUserMode();
-
+extern void blockOnMbox();
 #endif
