@@ -10,12 +10,14 @@ semaphore 	running;
 static int	ClockDriver(char *);
 static int	DiskDriver(char *);
 
-void start3(void)
+int start3(char *args)
 {
     char	name[128];
     char        termbuf[10];
     int		i;
     int		clockPID;
+    int         diskPIDs[USLOSS_DISK_UNITS];
+    int         termPIDs[USLOSS_TERM_UNITS];
     int		pid;
     int		status;
 
@@ -34,11 +36,11 @@ void start3(void)
 	USLOSS_Console("start3(): Can't create clock driver\n");
 	USLOSS_Halt(1);
     }
+
     /*
      * Wait for the clock driver to start. The idea is that ClockDriver
      * will V the semaphore "running" once it is running.
      */
-
     sempReal(running);
 
     /*
@@ -46,22 +48,38 @@ void start3(void)
      * the stack size depending on the complexity of your
      * driver, and perhaps do something with the pid returned.
      */
-
-    for (i = 0; i < USLOSS_DISK_UNITS; i++) {
+    for (i = 0; i < USLOSS_DISK_UNITS; i++)
+    {
         sprintf(buf, "%d", i);
         pid = fork1(name, DiskDriver, buf, USLOSS_MIN_STACK, 2);
-        if (pid < 0) {
+        diskPIDs[i] = pid;
+        if (pid < 0)
+        {
             USLOSS_Console("start3(): Can't create term driver %d\n", i);
             USLOSS_Halt(1);
         }
+
+        // Wait for the driver to start
+        sempReal(running);
     }
 
     // May be other stuff to do here before going on to terminal drivers
 
-    /*
-     * Create terminal device drivers.
-     */
+    // Create terminal device drivers
+    for (i = 0; i < USLOSS_TERM_UNITS; i++)
+    {
+        sprintf(buf, "%d", i);
+        pid = fork1(name, TermDriver, buf, USLOSS_MIN_STACK, 2);
+        termPIDs[i] = pid;
+        if (pid < 0)
+        {
+            USLOSS_Console("start3(): Can't create term driver %d\n", i);
+            USLOSS_Halt(1);
+        }
 
+        // Wait for the driver to start
+        sempReal(running);
+    }
 
     /*
      * Create first user-level process and wait for it to finish.
@@ -73,18 +91,23 @@ void start3(void)
     pid = spawnReal("start4", start4, NULL, 4 * USLOSS_MIN_STACK, 3);
     pid = waitReal(&status);
 
-    /*
-     * Zap the device drivers
-     */
-    zap(clockPID);  // clock driver
+    // Zap the device drivers
+    zap(clockPID);
+    for (i = 0; i < USLOSS_DISK_UNITS; i++)
+    {
+        zap(diskPIDs[i]);
+    }
+    for (i = 0; i < USLOSS_TERM_UNITS; i++)
+    {
+        zap(termPIDs[i]);
+    }
 
-    // eventually, at the end:
+    // Quit
     quit(0);
-    
+    return 0;
 }
 
-static int
-ClockDriver(char *arg)
+static int ClockDriver(char *arg)
 {
     int result;
     int status;
@@ -94,9 +117,11 @@ ClockDriver(char *arg)
     USLOSS_PsrSet(USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
 
     // Infinite loop until we are zap'd
-    while(! is_zapped()) {
+    while(!isZapped())
+    {
 	result = waitdevice(USLOSS_CLOCK_DEV, 0, &status);
-	if (result != 0) {
+	if (result != 0)
+        {
 	    return 0;
 	}
 	/*
@@ -104,10 +129,31 @@ ClockDriver(char *arg)
 	 * whose time has come.
 	 */
     }
+    quit(0);
 }
 
-static int
-DiskDriver(char *arg)
+static int DiskDriver(char *arg)
 {
     return 0;
+}
+
+void sleep(systemArgs *args)
+{
+    // Unpack args
+    int secs = (int) ((long) args->arg1);
+
+    // Defer to sleepReal
+    long result = sleepReal(secs);
+
+    // Put return values in args 
+    args->arg4 = (void *) result;
+
+    // Set to user mode
+    setToUserMode();
+}
+
+int sleepReal(int secs)
+{
+    // Put an entry in the clock driver queue
+    // Block this process
 }
