@@ -1,10 +1,12 @@
 #ifndef _DEVICES_H
 #define _DEVICES_H
 
-#define DEBUG4 1;
+#define DEBUG4 1
 
 typedef struct process process;
 typedef struct process * processPtr;
+
+typedef int semaphore;
 
 struct process
 {

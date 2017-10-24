@@ -5,7 +5,11 @@
 #include <phase3.h>
 #include <phase4.h>
 #include <stdlib.h>
+#include <stdio.h>
+
 #include "devices.h"
+#include "providedPrototypes.h"
+#include "phase4utility.h"
 
 // Debugging flag
 int debugflag4 = 0;
@@ -14,6 +18,7 @@ semaphore 	running;
 
 static int	ClockDriver(char *);
 static int	DiskDriver(char *);
+static int      TermDriver(char *);
 
 void sleep(systemArgs *);
 void diskRead();
@@ -39,13 +44,13 @@ int start3(char *args)
     }
 
     char	name[128];
-    char        termbuf[10];
-    int		i;
+//    char        termbuf[10];
     int		clockPID;
     int         diskPIDs[USLOSS_DISK_UNITS];
     int         termPIDs[USLOSS_TERM_UNITS];
     int		pid;
     int		status;
+    char        buf[10];
 
     // Check kernel mode
     checkMode("start3");
@@ -89,7 +94,7 @@ int start3(char *args)
      * the stack size depending on the complexity of your
      * driver, and perhaps do something with the pid returned.
      */
-    for (i = 0; i < USLOSS_DISK_UNITS; i++)
+    for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
         sprintf(buf, "%d", i);
         pid = fork1(name, DiskDriver, buf, USLOSS_MIN_STACK, 2);
@@ -107,7 +112,7 @@ int start3(char *args)
     // May be other stuff to do here before going on to terminal drivers
 
     // Create terminal device drivers
-    for (i = 0; i < USLOSS_TERM_UNITS; i++)
+    for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
         sprintf(buf, "%d", i);
         pid = fork1(name, TermDriver, buf, USLOSS_MIN_STACK, 2);
@@ -134,11 +139,11 @@ int start3(char *args)
 
     // Zap the device drivers
     zap(clockPID);
-    for (i = 0; i < USLOSS_DISK_UNITS; i++)
+    for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
         zap(diskPIDs[i]);
     }
-    for (i = 0; i < USLOSS_TERM_UNITS; i++)
+    for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
         zap(termPIDs[i]);
     }
@@ -148,6 +153,9 @@ int start3(char *args)
     return 0;
 }
 
+/*
+ * Entry function for the clock driver process.
+ */
 static int ClockDriver(char *arg)
 {
     int result;
@@ -155,12 +163,17 @@ static int ClockDriver(char *arg)
 
     // Let the parent know we are running and enable interrupts.
     semvReal(running);
-    USLOSS_PsrSet(USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
+    int result = USLOSS_PsrSet(USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
+    if (result != USLOSS_DEV_OK)
+    {
+        USLOSS_Console("ClockDriver(): Bug in enable interrupts.\n");
+        USLOSS_Halt(1);
+    }
 
     // Infinite loop until we are zap'd
     while(!isZapped())
     {
-	result = waitdevice(USLOSS_CLOCK_DEV, 0, &status);
+	result = waitDevice(USLOSS_CLOCK_DEV, 0, &status);
 	if (result != 0)
         {
 	    return 0;
@@ -173,9 +186,20 @@ static int ClockDriver(char *arg)
     quit(0);
 }
 
+/*
+ * Entry function for the disk driver process.
+ */
 static int DiskDriver(char *arg)
 {
-    return 0;
+    return 0; // TODO
+}
+
+/*
+ * Entry function for the term driver process.
+ */
+static int TermDriver(char *arg)
+{
+    return 0; // TODO
 }
 
 void sleep(systemArgs *args)
@@ -198,4 +222,6 @@ int sleepReal(int secs)
     // Put an entry in the clock driver queue
     // Block this process
     blockOnMbox();
+
+    return 0; // TODO
 }
