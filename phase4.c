@@ -173,6 +173,10 @@ int start3(char *args)
  */
 static int ClockDriver(char *arg)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("ClockDriver(): called.\n");
+    }
     // Let the parent know we are running and enable interrupts.
     semvReal(running);
     int result = USLOSS_PsrSet(USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
@@ -204,6 +208,10 @@ static int ClockDriver(char *arg)
  */
 static int DiskDriver(char *arg)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("DiskDriver(): called.\n");
+    }
     semvReal(running);
     return 0; // TODO
 }
@@ -213,12 +221,20 @@ static int DiskDriver(char *arg)
  */
 static int TermDriver(char *arg)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("TermDriver(): called.\n");
+    }
     semvReal(running);
     return 0; // TODO
 }
 
 void sleep(systemArgs *args)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("sleep(): called.\n");
+    }
     // Unpack args
     int secs = (int) ((long) args->arg1);
 
@@ -234,6 +250,10 @@ void sleep(systemArgs *args)
 
 int sleepReal(int secs)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("sleepReal(): called.\n");
+    }
     // Check args
     if (secs < 0)
     {
@@ -253,40 +273,80 @@ int sleepReal(int secs)
 
 void diskRead(systemArgs *args)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskRead(): called.\n");
+    }
 }
 
 void diskReadReal()
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskReadReal(): called.\n");
+    }
 }
 
 void diskWrite(systemArgs *args)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskWrite(): called.\n");
+    }
 }
 
 void diskWriteReal()
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskWriteReal(): called.\n");
+    }
 }
 
 void diskSize(systemArgs *args)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskSize(): called.\n");
+    }
 }
 
 void diskSizeReal()
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskSizeReal(): called.\n");
+    }
 }
 
 void termRead(systemArgs *args)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("termRead(): called.\n");
+    }
 }
 
 void termReadReal()
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("termReadReal(): called.\n");
+    }
 }
 
 void termWrite(systemArgs *args)
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("termWrite(): called.\n");
+    }
 }
 
 void termWriteReal()
 {
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("termWriteReal(): called.\n");
+    }
 }
