@@ -8,13 +8,12 @@ ASSIGNMENT = 452phase4
 CC = gcc
 AR = ar
 
-COBJS = phase4.o phase4utility.o
+COBJS = phase4.o phase4utility.o libuser.o
 CSRCS = ${COBJS:.o=.c}
 
 PHASE1LIB = patrickphase1
 PHASE2LIB = patrickphase2
-#PHASE1LIB = patrickphase1debug
-#PHASE2LIB = patrickphase2debug
+PHASE3LIB = patrickphase3
 
 HDRS = providedPrototypes.h libuser.h devices.h phase4utility.h phase1.h phase2.h phase3.h phase4.h
 
@@ -33,7 +32,7 @@ TESTS = test00 test01 test02 test03 test04 test05 test06 test07 test08 \
         test09 test10 test11 test12 test13 test14 test15 test16 test17 \
         test18
 
-LIBS = -l$(PHASE2LIB) -l$(PHASE1LIB) -lusloss3.6 -l$(PHASE1LIB) -l$(PHASE2LIB) -lphase4
+LIBS = -l$(PHASE3LIB) -l$(PHASE2LIB) -l$(PHASE1LIB) -lusloss3.6 -l$(PHASE1LIB) -l$(PHASE2LIB) -l $(PHASE3LIB) -lphase4
 
 
 $(TARGET):	$(COBJS)

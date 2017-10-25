@@ -158,9 +158,6 @@ int start3(char *args)
  */
 static int ClockDriver(char *arg)
 {
-    int result;
-    int status;
-
     // Let the parent know we are running and enable interrupts.
     semvReal(running);
     int result = USLOSS_PsrSet(USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
@@ -171,6 +168,7 @@ static int ClockDriver(char *arg)
     }
 
     // Infinite loop until we are zap'd
+    int status;
     while(!isZapped())
     {
 	result = waitDevice(USLOSS_CLOCK_DEV, 0, &status);
@@ -183,7 +181,7 @@ static int ClockDriver(char *arg)
 	 * whose time has come.
 	 */
     }
-    quit(0);
+    return 0;
 }
 
 /*
@@ -224,4 +222,44 @@ int sleepReal(int secs)
     blockOnMbox();
 
     return 0; // TODO
+}
+
+void diskRead(systemArgs *args)
+{
+}
+
+void diskReadReal()
+{
+}
+
+void diskWrite(systemArgs *args)
+{
+}
+
+void diskWriteReal()
+{
+}
+
+void diskSize(systemArgs *args)
+{
+}
+
+void diskSizeReal()
+{
+}
+
+void termRead(systemArgs *args)
+{
+}
+
+void termReadReal()
+{
+}
+
+void termWrite(systemArgs *args)
+{
+}
+
+void termWriteReal()
+{
 }

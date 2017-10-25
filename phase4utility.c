@@ -1,5 +1,12 @@
 #include <usloss.h>
+#include <usyscall.h>
+#include <stdlib.h>
+#include "phase1.h"
+#include "phase2.h"
 #include "phase4utility.h"
+#include "devices.h"
+
+extern process ProcTable[];
 
 /*
  * Checks the current mode of the current status and halts if the process is in
@@ -42,7 +49,7 @@ void setToUserMode()
  */
 void blockOnMbox()
 {
-    processPtr proc = ProcTable[getpid() % MAXPROC];
+    processPtr proc = &ProcTable[getpid() % MAXPROC];
     MboxReceive(proc->privateMboxID, NULL, 0);
 }
 
