@@ -12,14 +12,17 @@
 #include "phase4utility.h"
 
 // Debugging flag
-int debugflag4 = 0;
+int debugflag4 = 1;
 
-semaphore 	running;
+// Semaphore used to create drivers
+semaphore running;
 
-static int	ClockDriver(char *);
-static int	DiskDriver(char *);
-static int      TermDriver(char *);
+// Driver process functions
+static int ClockDriver(char *);
+static int DiskDriver(char *);
+static int TermDriver(char *);
 
+// Syscall handler prototypes
 void sleep(systemArgs *);
 void diskRead();
 void diskWrite();
@@ -34,6 +37,7 @@ void diskSizeReal();
 void termReadReal();
 void termWriteReal();
 
+// Phase 4 proc table
 process ProcTable[MAXPROC];
 
 int start3(char *args)
@@ -43,19 +47,22 @@ int start3(char *args)
         USLOSS_Console("start3(): started");
     }
 
-    char	name[128];
-//    char        termbuf[10];
-    int		clockPID;
-    int         diskPIDs[USLOSS_DISK_UNITS];
-    int         termPIDs[USLOSS_TERM_UNITS];
-    int		pid;
-    int		status;
-    char        buf[10];
+    char name[128];
+    // char termbuf[10];
+    int clockPID;
+    int diskPIDs[USLOSS_DISK_UNITS];
+    int termPIDs[USLOSS_TERM_UNITS];
+    int	status;
+    char buf[10];
 
     // Check kernel mode
     checkMode("start3");
 
     // Initialize the system call vector
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("start3(): Initializing syscall vector.\n");
+    }
     systemCallVec[SYS_SLEEP] = sleep;
     systemCallVec[SYS_DISKREAD] = diskRead;
     systemCallVec[SYS_DISKWRITE] = diskWrite;
@@ -64,40 +71,41 @@ int start3(char *args)
     systemCallVec[SYS_TERMWRITE] = termWrite;
 
     // Initialize the ProcTable
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("start3(): Initializing ProcTable.\n");
+    }
     for (int i = 0; i < MAXPROC; i++)
     {
         ProcTable[i].pid = EMPTY;
         ProcTable[i].privateMboxID = MboxCreate(0, MAX_MESSAGE);
     }
 
-    /*
-     * Create clock device driver
-     * I am assuming a semaphore here for coordination.  A mailbox can
-     * be used instead -- your choice.
-     */
+    // Create clock device driver
     running = semcreateReal(0);
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("start3(): Creating clock device driver.\n");
+    }
     clockPID = fork1("Clock driver", ClockDriver, NULL, USLOSS_MIN_STACK, 2);
     if (clockPID < 0)
     {
-	       USLOSS_Console("start3(): Can't create clock driver\n");
-	       USLOSS_Halt(1);
+        USLOSS_Console("start3(): Can't create clock driver\n");
+        USLOSS_Halt(1);
     }
 
-    /*
-     * Wait for the clock driver to start. The idea is that ClockDriver
-     * will V the semaphore "running" once it is running.
-     */
+    // Wait for the clock driver to start. ClockDriver will V running once it starts.
     sempReal(running);
 
-    /*
-     * Create the disk device drivers here.  You may need to increase
-     * the stack size depending on the complexity of your
-     * driver, and perhaps do something with the pid returned.
-     */
+    // Create the disk device drivers
     for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("start3(): Creating disk device driver %d.\n", i);
+        }
         sprintf(buf, "%d", i);
-        pid = fork1(name, DiskDriver, buf, USLOSS_MIN_STACK, 2);
+        int pid = fork1(name, DiskDriver, buf, USLOSS_MIN_STACK, 2);
         diskPIDs[i] = pid;
         if (pid < 0)
         {
@@ -114,8 +122,12 @@ int start3(char *args)
     // Create terminal device drivers
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("start3(): Creating terminal device driver %d.\n", i);
+        }
         sprintf(buf, "%d", i);
-        pid = fork1(name, TermDriver, buf, USLOSS_MIN_STACK, 2);
+        int pid = fork1(name, TermDriver, buf, USLOSS_MIN_STACK, 2);
         termPIDs[i] = pid;
         if (pid < 0)
         {
@@ -127,14 +139,17 @@ int start3(char *args)
         sempReal(running);
     }
 
-    /*
-     * Create first user-level process and wait for it to finish.
-     * These are lower-case because they are not system calls;
-     * system calls cannot be invoked from kernel mode.
-     * I'm assuming kernel-mode versions of the system calls
-     * with lower-case first letters, as shown in provided_prototypes.h
-     */
-    pid = spawnReal("start4", start4, NULL, 4 * USLOSS_MIN_STACK, 3);
+    // Create first user-level process and wait for it to finish.
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("start3(): Spawning start4.\n");
+    }
+    int pid = spawnReal("start4", start4, NULL, 4 * USLOSS_MIN_STACK, 3);
+    if (pid < 0)
+    {
+        USLOSS_Console("start3(): Can't create start4.\n");
+        USLOSS_Halt(1);
+    }
     pid = waitReal(&status);
 
     // Zap the device drivers
@@ -189,6 +204,7 @@ static int ClockDriver(char *arg)
  */
 static int DiskDriver(char *arg)
 {
+    semvReal(running);
     return 0; // TODO
 }
 
@@ -197,6 +213,7 @@ static int DiskDriver(char *arg)
  */
 static int TermDriver(char *arg)
 {
+    semvReal(running);
     return 0; // TODO
 }
 
