@@ -234,11 +234,21 @@ void sleep(systemArgs *args)
 
 int sleepReal(int secs)
 {
+    // Check args
+    if (secs < 0)
+    {
+        return -1;
+    }
+
     // Put an entry in the clock driver queue
+
     // Block this process
     blockOnMbox();
 
-    return 0; // TODO
+    // The clock driver will unblock us when appropriate
+
+    // Return the result
+    return 0;
 }
 
 void diskRead(systemArgs *args)
