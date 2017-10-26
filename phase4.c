@@ -190,15 +190,15 @@ static int ClockDriver(char *arg)
     int status;
     while(!isZapped())
     {
-	result = waitDevice(USLOSS_CLOCK_DEV, 0, &status);
-	if (result != 0)
-        {
-	    return 0;
-	}
-	/*
-	 * Compute the current time and wake up any processes
-	 * whose time has come.
-	 */
+	     result = waitDevice(USLOSS_CLOCK_DEV, 0, &status);
+	     if (result != 0)
+       {
+	        return 0;
+	     }
+	 /*
+	  * Compute the current time and wake up any processes
+	  * whose time has come.
+	  */
     }
     return 0;
 }
