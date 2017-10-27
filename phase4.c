@@ -321,11 +321,11 @@ void diskRead(systemArgs *args)
     {
         USLOSS_Console("diskRead(): called.\n");
     }
-    void* memoryAddress = sysArg.arg1;
-    int numSectorsToRead = (int) ((long) sysArg.arg2);
-    int startDiskTrack = (int) ((long) sysArg.arg3);
-    int startDiskSector = (int) ((long) sysArg.arg4);
-    int unitNumToRead = (int) ((long) sysArg.arg5);
+    void* memoryAddress = args->arg1;
+    int numSectorsToRead = (int) ((long) args->arg2);
+    int startDiskTrack = (int) ((long) args->arg3);
+    int startDiskSector = (int) ((long) args->arg4);
+    int unitNumToRead = (int) ((long) args->arg5);
 
     // check for illegal input values
     if(numSectorsToRead < 0 || numSectorsToRead >= USLOSS_DISK_TRACKS){  // TODO: How many tracks are there per disk?
@@ -345,8 +345,10 @@ void diskRead(systemArgs *args)
         return;
     }
 
-    return diskReadReal(memoryAddress, numSectorsToRead, startDiskTrack,
-                        startDiskSector, unitNumToRead);
+    int result = diskReadReal(memoryAddress, numSectorsToRead, startDiskTrack,
+                              startDiskSector, unitNumToRead);
+
+    args->arg1 = (void*) ((long) result);
 }
 
 int diskReadReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,

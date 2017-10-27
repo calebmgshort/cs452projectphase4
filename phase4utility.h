@@ -3,6 +3,7 @@
 #include "devices.h"
 
 extern void checkMode(char *);
+extern int enableInterrupts();
 extern void setToUserMode();
 extern void blockOnMbox();
 extern void unblockByMbox(processPtr);

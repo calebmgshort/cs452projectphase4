@@ -25,6 +25,18 @@ void checkMode(char *funcName)
 }
 
 /*
+ * Enable interrupts
+ */
+int enableInterrupts(){
+    int result = USLOSS_PsrSet(USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
+    if (result != USLOSS_DEV_OK)
+    {
+        USLOSS_Console("ClockDriver(): Bug in enable interrupts.\n");
+        USLOSS_Halt(1);
+    }
+}
+
+/*
  * Sets the current process into user mode. Requires the process to currently
  * be in kernel mode. Also enables interrupts.
  */
