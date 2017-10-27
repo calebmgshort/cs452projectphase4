@@ -31,7 +31,7 @@ void termRead();
 void termWrite();
 
 int sleepReal(int);
-void diskReadReal();
+int diskReadReal(void*, int, int, int, int);
 void diskWriteReal();
 void diskSizeReal();
 void termReadReal();
@@ -277,14 +277,43 @@ void diskRead(systemArgs *args)
     {
         USLOSS_Console("diskRead(): called.\n");
     }
+    void* memoryAddress = sysArg.arg1;
+    int numSectorsToRead = (int) ((long) sysArg.arg2);
+    int startDiskTrack = (int) ((long) sysArg.arg3);
+    int startDiskSector = (int) ((long) sysArg.arg4);
+    int unitNumToRead = (int) ((long) sysArg.arg5);
+
+    // check for illegal input values
+    if(numSectorsToRead < 0 || numSectorsToRead >= USLOSS_DISK_TRACKS){  // TODO: How many tracks are there per disk?
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(startDiskTrack < 0 || startDiskTrack >= USLOSS_DISK_TRACKS){  // TODO: How many tracks are there per disk?
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE){
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(unitNumToRead < 0 || unitNumToRead > USLOSS_DISK_UNITS){
+        args->arg4 = (void*) -1;
+        return;
+    }
+
+    return diskReadReal(memoryAddress, numSectorsToRead, startDiskTrack,
+                        startDiskSector, unitNumToRead);
 }
 
-void diskReadReal()
+int diskReadReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
+                 int startDiskSector, int unitNumToRead)
 {
     if(DEBUG4 && debugflag4)
     {
         USLOSS_Console("diskReadReal(): called.\n");
     }
+    // TODO: Implement
+    return 0;
 }
 
 void diskWrite(systemArgs *args)
