@@ -39,6 +39,7 @@ void termWriteReal();
 
 // Phase 4 proc table
 process ProcTable[MAXPROC];
+processPtr ClockDriverQueue = NULL;
 
 int start3(char *args)
 {
@@ -79,6 +80,9 @@ int start3(char *args)
     {
         ProcTable[i].pid = EMPTY;
         ProcTable[i].privateMboxID = MboxCreate(0, MAX_MESSAGE);
+        ProcTable[i].nextProc = NULL;
+        ProcTable[i].blockStartTime = -1;
+        ProcTable[i].sleepTime = -1;
     }
 
     // Create clock device driver
@@ -153,6 +157,10 @@ int start3(char *args)
     pid = waitReal(&status);
 
     // Zap the device drivers
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("start3(): Zapping device drivers.\n");
+    }
     zap(clockPID);
     for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
@@ -190,15 +198,42 @@ static int ClockDriver(char *arg)
     int status;
     while(!isZapped())
     {
-	     result = waitDevice(USLOSS_CLOCK_DEV, 0, &status);
-	     if (result != 0)
-       {
-	        return 0;
-	     }
-	 /*
-	  * Compute the current time and wake up any processes
-	  * whose time has come.
-	  */
+        result = waitDevice(USLOSS_CLOCK_DEV, 0, &status);
+        if (result != 0)
+        {
+            return 0;
+        }
+
+        // Iterate over the queue and check for procs to unblock
+        processPtr proc = ClockDriverQueue;
+        processPtr parent = NULL;
+        while (proc != NULL)
+        {
+            if (proc->blockStartTime == -1)
+            {
+                proc->blockStartTime = status;
+            }
+            int mcsPassed = (status - proc->blockStartTime);
+            if (mcsPassed > 1000000 * proc->sleepTime)
+            {
+                // Enough time has elapsed; unblock proc
+                proc->sleepTime = -1;
+                proc->blockStartTime = -1;
+                if (parent == NULL)
+                {
+                    ClockDriverQueue = proc->nextProc;
+                }
+                else
+                {
+                    parent->nextProc = proc->nextProc;
+                }
+                proc->nextProc = NULL;
+                unblockByMbox(proc);
+            }
+            // Step through the queue
+            parent = proc;
+            proc = proc->nextProc;
+        }
     }
     return 0;
 }
@@ -261,6 +296,15 @@ int sleepReal(int secs)
     }
 
     // Put an entry in the clock driver queue
+    addProcToClockQueue(&ProcTable[getpid() % MAXPROC]);
+
+    // Set the sleep time in the process table
+    ProcTable[getpid() % MAXPROC].sleepTime = secs;
+
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("sleepReal(): About to block process %d.\n", getpid());
+    }
 
     // Block this process
     blockOnMbox();
