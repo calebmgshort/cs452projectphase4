@@ -1,4 +1,16 @@
+#include <usloss.h>
+#include <usyscall.h>
+#include <phase1.h>
+#include <phase2.h>
+#include <phase3.h>
+#include <phase4.h>
+#include <stdlib.h>
+#include <stdio.h>
+
 #include "libuser.h"
+#include "devices.h"
+
+extern int debugflag4;
 
 #define CHECKMODE {    \
     if (USLOSS_PsrGet() & USLOSS_PSR_CURRENT_MODE) { \
@@ -134,5 +146,5 @@ int TermWrite(char *buff, int bsize, int unit_id, int *nwrite)
     *nwrite = (int) ((long) sysArg.arg2);
     int returnStatus = (int) ((long) sysArg.arg4);
 
-    return returnStatus; 
+    return returnStatus;
 }
