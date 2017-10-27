@@ -7,6 +7,7 @@
 #include "devices.h"
 
 extern process ProcTable[];
+extern processPtr ClockDriverQueue;
 
 /*
  * Checks the current mode of the current status and halts if the process is in
@@ -53,3 +54,51 @@ void blockOnMbox()
     MboxReceive(proc->privateMboxID, NULL, 0);
 }
 
+/*
+ * Unblocks the given process by sending to its private mailbox.
+ */
+void unblockByMbox(processPtr proc)
+{
+    MboxSend(proc->privateMboxID, NULL, 0);
+}
+
+/*
+ * Adds a process to the back of the ClockDriverQueue.
+ */
+void addProcToClockQueue(processPtr proc)
+{
+    if (ClockDriverQueue == NULL)
+    {
+        ClockDriverQueue = proc;
+    }
+    else
+    {
+        processPtr parent = ClockDriverQueue;
+        while (parent->nextProc != NULL)
+        {
+            parent = parent->nextProc;
+        }
+        parent->nextProc = proc;
+    }
+}
+
+/*
+ * Returns the head of the ClockDriverQueue.
+ */
+processPtr nextClockQueueProc()
+{
+    return ClockDriverQueue;
+}
+
+/*
+ * Removes one process from the ClockDriverQueue. If there are no processes in
+ * the queue, then no action is taken.
+ */
+void removeClockQueueProc()
+{
+    if (ClockDriverQueue == NULL)
+    {
+        return;
+    }
+    ClockDriverQueue = ClockDriverQueue->nextProc;
+}
