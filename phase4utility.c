@@ -27,7 +27,8 @@ void checkMode(char *funcName)
 /*
  * Enable interrupts
  */
-int enableInterrupts(){
+void enableInterrupts()
+{
     int result = USLOSS_PsrSet(USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
     if (result != USLOSS_DEV_OK)
     {
@@ -113,4 +114,104 @@ void removeClockQueueProc()
         return;
     }
     ClockDriverQueue = ClockDriverQueue->nextProc;
+}
+
+void checkClockQueue(int clockStatus)
+{
+    // Iterate over the queue and check for procs to unblock
+    processPtr proc = ClockDriverQueue;
+    processPtr parent = NULL;
+    while (proc != NULL)
+    {
+        if (proc->blockStartTime == -1)
+        {
+            proc->blockStartTime = clockStatus;
+        }
+        int mcsPassed = (clockStatus - proc->blockStartTime);
+        if (mcsPassed > 1000000 * proc->sleepTime)
+        {
+            // Enough time has elapsed; unblock proc
+            proc->sleepTime = -1;
+            proc->blockStartTime = -1;
+            if (parent == NULL)
+            {
+                ClockDriverQueue = proc->nextProc;
+            }
+            else
+            {
+                parent->nextProc = proc->nextProc;
+            }
+            proc->nextProc = NULL;
+            unblockByMbox(proc);
+        }
+        // Step through the queue
+        parent = proc;
+        proc = proc->nextProc;
+    }
+}
+
+void diskQueueAdd(int op, void *memAddresss, int numSectors, int startTrack, int startSector, int unit)
+{
+    processPtr proc = &ProcTable[getpid() % MAXPROC];
+    diskRequest *request = &proc->diskRequest;
+
+    request->op = op;
+    request->memAddress = memAddress;
+    request->numSectors = numSectors;
+    request->startTrack = startTrack;
+    request->startSector = startSector;
+    request->unit = unit;
+
+    if (DiskDriverQueue == NULL)
+    {
+        DiskDriverQueue = proc;
+    {
+    else if (compareRequests(&(DiskDriverQueue->diskRequest), &(proc->diskRequest)) > 0)
+    {
+        proc->nextDiskQueueProc = DiskDriverQueue;
+        DiskDriverQueue = proc;
+    }
+    else
+    {
+        processPtr current = DiskDriverQueue;
+        processPtr next = current->nextDiskQueueProc;
+        while (next != null && compareRequests(&(proc->diskRequest), &(current->diskRequest)) > 0)
+        {
+            current = next;
+            next = next->nextDiskQueueProc;
+        }
+        current->nextDiskQueueProc = proc;
+        proc->nextDiskQueueProc = next;
+    }
+}
+
+void clearProcRequest(processPtr proc)
+{
+    proc->request.op = EMPTY;
+    proc->request.memAddress = NULL;
+    proc->request.numSectors = EMPTY;
+    proc->request.startTrack = EMPTY;
+    proc->request.startSector = EMPTY;
+    proc->request.unit = EMPTY;
+}
+
+int compareRequests(diskRequest *req1, diskRequest *req2)
+{
+    if (req1->startTrack > req2->startTrack)
+    {
+        return 1;
+    }
+    else if (req2->startTrack > req1->startTrack)
+    {
+        return -1;
+    }
+    else if (req1->startSector > req2->startSector)
+    {
+        return 1;
+    }
+    else if (req2->startSector > req1->startSector)
+    {
+        return -1;
+    }
+    return 0;
 }

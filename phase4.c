@@ -12,7 +12,7 @@
 #include "phase4utility.h"
 
 // Debugging flag
-int debugflag4 = 1;
+int debugflag4 = 0;
 
 // Semaphore used to create drivers
 semaphore running;
@@ -39,13 +39,19 @@ void termWriteReal();
 
 // Phase 4 proc table
 process ProcTable[MAXPROC];
+
+// Driver queues
 processPtr ClockDriverQueue = NULL;
+processPtr DiskDriverQueue = NULL;
+
+// Disk sizes
+int DiskSize[USLOSS_DISK_UNITS];
 
 int start3(char *args)
 {
     if(DEBUG4 && debugflag4)
     {
-        USLOSS_Console("start3(): started");
+        USLOSS_Console("start3(): started.\n");
     }
 
     char name[128];
@@ -156,6 +162,11 @@ int start3(char *args)
     }
     pid = waitReal(&status);
 
+    for (int i = 0; i < 6; i++)
+    {
+        waitReal(&status);
+    }
+
     // Zap the device drivers
     if (DEBUG4 && debugflag4)
     {
@@ -164,11 +175,15 @@ int start3(char *args)
     zap(clockPID);
     for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
-        zap(diskPIDs[i]);
+        if (0)
+            USLOSS_Console("%d", diskPIDs[i]);
+        // zap(diskPIDs[i]);
     }
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
-        zap(termPIDs[i]);
+        if (0)
+            USLOSS_Console("%d", termPIDs[i]);
+        // zap(termPIDs[i]);
     }
 
     // Quit
@@ -187,53 +202,20 @@ static int ClockDriver(char *arg)
     }
     // Let the parent know we are running and enable interrupts.
     semvReal(running);
-    int result = USLOSS_PsrSet(USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
-    if (result != USLOSS_DEV_OK)
-    {
-        USLOSS_Console("ClockDriver(): Bug in enable interrupts.\n");
-        USLOSS_Halt(1);
-    }
+    enableInterrupts();
 
     // Infinite loop until we are zap'd
     int status;
     while(!isZapped())
     {
-        result = waitDevice(USLOSS_CLOCK_DEV, 0, &status);
+        int result = waitDevice(USLOSS_CLOCK_DEV, 0, &status);
         if (result != 0)
         {
             return 0;
         }
 
-        // Iterate over the queue and check for procs to unblock
-        processPtr proc = ClockDriverQueue;
-        processPtr parent = NULL;
-        while (proc != NULL)
-        {
-            if (proc->blockStartTime == -1)
-            {
-                proc->blockStartTime = status;
-            }
-            int mcsPassed = (status - proc->blockStartTime);
-            if (mcsPassed > 1000000 * proc->sleepTime)
-            {
-                // Enough time has elapsed; unblock proc
-                proc->sleepTime = -1;
-                proc->blockStartTime = -1;
-                if (parent == NULL)
-                {
-                    ClockDriverQueue = proc->nextProc;
-                }
-                else
-                {
-                    parent->nextProc = proc->nextProc;
-                }
-                proc->nextProc = NULL;
-                unblockByMbox(proc);
-            }
-            // Step through the queue
-            parent = proc;
-            proc = proc->nextProc;
-        }
+        // Check the queue and unblock procs
+        checkClockQueue(status);
     }
     return 0;
 }
@@ -247,8 +229,29 @@ static int DiskDriver(char *arg)
     {
         USLOSS_Console("DiskDriver(): called.\n");
     }
+
+    // Enable interrupts and tell parent that we're running
     semvReal(running);
-    return 0; // TODO
+    enableInterrupts();
+
+    // Find the size of t
+    int unit = atoi(arg);
+
+    // Request the disk size
+    USLOSS_DeviceRequest request;
+    request.opr = USLOSS_DISK_TRACKS;
+    request.reg1 = &DiskSizes[unit];
+    int result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, &request);
+    if (result != USLOSS_DEV_OK)
+    {
+        USLOSS_Console("diskSizeReal(): Could not get number of tracks.\n");
+        USLOSS_Halt(1);
+    }
+
+    while (!isZapped())
+    {
+    }
+    return 0;
 }
 
 /*
@@ -328,19 +331,23 @@ void diskRead(systemArgs *args)
     int unitNumToRead = (int) ((long) args->arg5);
 
     // check for illegal input values
-    if(numSectorsToRead < 0 || numSectorsToRead >= USLOSS_DISK_TRACKS){  // TODO: How many tracks are there per disk?
+    if(numSectorsToRead < 0 || numSectorsToRead >= DiskSizes[unitNumToRead])
+    {
         args->arg4 = (void*) -1;
         return;
     }
-    else if(startDiskTrack < 0 || startDiskTrack >= USLOSS_DISK_TRACKS){  // TODO: How many tracks are there per disk?
+    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
+    {
         args->arg4 = (void*) -1;
         return;
     }
-    else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE){
+    else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE)
+    {
         args->arg4 = (void*) -1;
         return;
     }
-    else if(unitNumToRead < 0 || unitNumToRead > USLOSS_DISK_UNITS){
+    else if(unitNumToRead < 0 || unitNumToRead > USLOSS_DISK_UNITS)
+    {
         args->arg4 = (void*) -1;
         return;
     }
@@ -349,6 +356,7 @@ void diskRead(systemArgs *args)
                               startDiskSector, unitNumToRead);
 
     args->arg1 = (void*) ((long) result);
+    args->arg4 = (void *) 0;
 }
 
 int diskReadReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
@@ -358,7 +366,10 @@ int diskReadReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
     {
         USLOSS_Console("diskReadReal(): called.\n");
     }
-    // TODO: Implement
+
+    // TODO: put this into the disk driver queue and block
+    diskQueueAdd(DISK_READ, memoryAddress, numSectorsToRead, startKistTrack, startDiskSector, unitNumToRead); 
+    blockOnMbox();
     return 0;
 }
 
@@ -386,12 +397,24 @@ void diskSize(systemArgs *args)
     }
 }
 
-void diskSizeReal()
+int diskSizeReal(int unit, int *sector, int *track, int *disk)
 {
     if(DEBUG4 && debugflag4)
     {
         USLOSS_Console("diskSizeReal(): called.\n");
     }
+
+    // Check params
+    if (unit != 0 && unit != 1)
+    {
+        return -1;
+    }
+
+    // Set the track and sector sizes
+    *track = USLOSS_DISK_TRACK_SIZE;
+    *sector = USLOSS_DISK_SECTOR_SIZE;
+    *disk = DiskSizes[unit];
+    return 0;
 }
 
 void termRead(systemArgs *args)

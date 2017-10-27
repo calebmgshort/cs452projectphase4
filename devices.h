@@ -6,17 +6,37 @@
 typedef struct process process;
 typedef struct process * processPtr;
 
+typedef struct diskRequest diskRequest;
+
 typedef int semaphore;
 
 struct process
 {
     int pid;                          // The pid of this process
     int privateMboxID;                // The id of the private mailbox used to block this process
+
+    // Clock fields
     processPtr nextProc;              // The next pointer for the clock driver queue
     int blockStartTime;               // The time at which this process was first blocked due to sleep
     int sleepTime;                    // The amount of time this process should sleep for
+
+    // Disk fields
+    processPtr nextDiskQueueProc;     // The next proc in the disk queue
+    diskRequest diskRequest;          // Holds information on the request to the disk
 };
 
-#define EMPTY -1;
+struct diskRequest
+{
+    int op;
+    void *memAddress;
+    int numSectors;
+    int startSector;
+    int startTrack;
+    int unit;
+};
+
+#define EMPTY -1
+#define DISK_READ 0
+#define DISK_WRITE 1
 
 #endif
