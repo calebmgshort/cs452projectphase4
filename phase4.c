@@ -12,7 +12,7 @@
 #include "phase4utility.h"
 
 // Debugging flag
-int debugflag4 = 0;
+int debugflag4 = 1;
 
 // Semaphore used to create drivers
 semaphore running;
@@ -33,7 +33,7 @@ void termWrite();
 int sleepReal(int);
 int diskReadReal(void*, int, int, int, int);
 void diskWriteReal();
-void diskSizeReal();
+int diskSizeReal(int, int *, int *, int *);
 void termReadReal();
 void termWriteReal();
 
@@ -43,9 +43,10 @@ process ProcTable[MAXPROC];
 // Driver queues
 processPtr ClockDriverQueue = NULL;
 processPtr DiskDriverQueue = NULL;
+processPtr NextDiskRequest = NULL;
 
-// Disk sizes
-int DiskSize[USLOSS_DISK_UNITS];
+// Disk sizes (number of tracks)
+int DiskSizes[USLOSS_DISK_UNITS];
 
 int start3(char *args)
 {
@@ -234,10 +235,10 @@ static int DiskDriver(char *arg)
     semvReal(running);
     enableInterrupts();
 
-    // Find the size of t
+    // Find the unit number 
     int unit = atoi(arg);
 
-    // Request the disk size
+    // Request the disk size and store in DiskSizes
     USLOSS_DeviceRequest request;
     request.opr = USLOSS_DISK_TRACKS;
     request.reg1 = &DiskSizes[unit];
@@ -250,6 +251,30 @@ static int DiskDriver(char *arg)
 
     while (!isZapped())
     {
+        processPtr requestProc = dequeueDiskRequest();
+        if (requestProc == NULL)
+        {
+            int status;
+            int result = waitDevice(USLOSS_DISK_DEV, unit, &status);
+            if (result != USLOSS_DEV_OK)
+            {
+                USLOSS_Console("DiskDriver(): Could not wait.\n");
+                USLOSS_Halt(1);
+            }
+            continue;
+        }
+        if (requestProc->diskRequest.op == DISK_READ)
+        {
+            performDiskOp(requestProc, USLOSS_DISK_READ);
+        }
+        else if (requestProc->diskRequest.op == DISK_WRITE)
+        {
+            performDiskOp(requestProc, USLOSS_DISK_WRITE);
+        }
+        else
+        {
+            USLOSS_Console("DiskDriver(): Invalid disk request %d.\n");
+        }
     }
     return 0;
 }
@@ -367,8 +392,8 @@ int diskReadReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
         USLOSS_Console("diskReadReal(): called.\n");
     }
 
-    // TODO: put this into the disk driver queue and block
-    diskQueueAdd(DISK_READ, memoryAddress, numSectorsToRead, startKistTrack, startDiskSector, unitNumToRead); 
+    // Put this into the disk driver queue and block
+    diskQueueAdd(DISK_READ, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead); 
     blockOnMbox();
     return 0;
 }

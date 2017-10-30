@@ -10,6 +10,16 @@ typedef struct diskRequest diskRequest;
 
 typedef int semaphore;
 
+struct diskRequest
+{
+    int op;
+    void *memAddress;
+    int numSectors;
+    int startSector;
+    int startTrack;
+    int unit;
+};
+
 struct process
 {
     int pid;                          // The pid of this process
@@ -23,16 +33,6 @@ struct process
     // Disk fields
     processPtr nextDiskQueueProc;     // The next proc in the disk queue
     diskRequest diskRequest;          // Holds information on the request to the disk
-};
-
-struct diskRequest
-{
-    int op;
-    void *memAddress;
-    int numSectors;
-    int startSector;
-    int startTrack;
-    int unit;
 };
 
 #define EMPTY -1

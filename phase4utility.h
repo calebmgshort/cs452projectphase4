@@ -11,4 +11,7 @@ extern void addProcToClockQueue(processPtr);
 extern processPtr nextClockQueueProc();
 extern void removeClockQueueProc();
 extern void checkClockQueue(int);
+extern void performDiskOp(processPtr, int);
+extern void diskQueueAdd(int, void *, int, int, int, int);
+extern processPtr dequeueDiskRequest();
 #endif
