@@ -98,9 +98,9 @@ int DiskSize(int unit, int *sector, int *track, int *disk)
 
     USLOSS_Syscall(&sysArg);
 
-    *sector = (int) ((long) sysArg.arg2);
-    *track = (int) ((long) sysArg.arg3);
-    *disk = (int) ((long) sysArg.arg1);   // TODO: Is this right? This should be the size of a sector
+    *sector = (int) ((long) sysArg.arg1); // Number of bytes in a sector
+    *track = (int) ((long) sysArg.arg2);  // Number of sectors in a track
+    *disk = (int) ((long) sysArg.arg3);   // Number of tracks in the disk
     int returnStatus = (int) ((long) sysArg.arg4);
 
     return returnStatus;

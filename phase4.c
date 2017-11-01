@@ -24,15 +24,15 @@ static int TermDriver(char *);
 
 // Syscall handler prototypes
 void sleep(systemArgs *);
-void diskRead();
-void diskWrite();
-void diskSize();
-void termRead();
-void termWrite();
+void diskRead(systemArgs *);
+void diskWrite(systemArgs *);
+void diskSize(systemArgs *);
+void termRead(systemArgs *);
+void termWrite(systemArgs *);
 
 int sleepReal(int);
 int diskReadReal(void*, int, int, int, int);
-void diskWriteReal();
+int diskWriteReal(void*, int, int, int, int);
 int diskSizeReal(int, int *, int *, int *);
 void termReadReal();
 void termWriteReal();
@@ -86,7 +86,7 @@ int start3(char *args)
     for (int i = 0; i < MAXPROC; i++)
     {
         ProcTable[i].pid = EMPTY;
-        ProcTable[i].privateMboxID = MboxCreate(0, MAX_MESSAGE);
+        ProcTable[i].privateMboxID = MboxCreate(0, MAX_MESSAGE);  // TODO: Will this work every time? Should we use a 1 slot mailbox with a condSend?
         ProcTable[i].nextProc = NULL;
         ProcTable[i].blockStartTime = -1;
         ProcTable[i].sleepTime = -1;
@@ -235,7 +235,7 @@ static int DiskDriver(char *arg)
     semvReal(running);
     enableInterrupts();
 
-    // Find the unit number 
+    // Find the unit number
     int unit = atoi(arg);
 
     // Request the disk size and store in DiskSizes
@@ -251,6 +251,7 @@ static int DiskDriver(char *arg)
 
     while (!isZapped())
     {
+        // Dequeue a disk request
         processPtr requestProc = dequeueDiskRequest();
         if (requestProc == NULL)
         {
@@ -275,6 +276,8 @@ static int DiskDriver(char *arg)
         {
             USLOSS_Console("DiskDriver(): Invalid disk request %d.\n");
         }
+        // Unblock the process that requested the disk operation
+        unblockByMbox(requestProc);
     }
     return 0;
 }
@@ -371,7 +374,7 @@ void diskRead(systemArgs *args)
         args->arg4 = (void*) -1;
         return;
     }
-    else if(unitNumToRead < 0 || unitNumToRead > USLOSS_DISK_UNITS)
+    else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
     {
         args->arg4 = (void*) -1;
         return;
@@ -393,8 +396,8 @@ int diskReadReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
     }
 
     // Put this into the disk driver queue and block
-    diskQueueAdd(DISK_READ, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead); 
-    blockOnMbox();
+    diskQueueAdd(DISK_READ, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead);
+    blockOnMbox();  // TODO: We still need to unblock this proc after it's finished on the queue
     return 0;
 }
 
@@ -404,14 +407,52 @@ void diskWrite(systemArgs *args)
     {
         USLOSS_Console("diskWrite(): called.\n");
     }
+    void* memoryAddress = args->arg1;
+    int numSectorsToRead = (int) ((long) args->arg2);
+    int startDiskTrack = (int) ((long) args->arg3);
+    int startDiskSector = (int) ((long) args->arg4);
+    int unitNumToRead = (int) ((long) args->arg5);
+
+    // check for illegal input values
+    if(numSectorsToRead < 0 || numSectorsToRead >= DiskSizes[unitNumToRead])
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE)
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+
+    int result = diskWriteReal(memoryAddress, numSectorsToRead, startDiskTrack,
+                              startDiskSector, unitNumToRead);
+
+    args->arg1 = (void*) ((long) result);
+    args->arg4 = (void *) 0;
 }
 
-void diskWriteReal()
+int diskWriteReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
+                 int startDiskSector, int unitNumToRead)
 {
     if(DEBUG4 && debugflag4)
     {
         USLOSS_Console("diskWriteReal(): called.\n");
     }
+    // Put this into the disk driver queue and block
+    diskQueueAdd(DISK_WRITE, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead);
+    blockOnMbox();
+    return 0;
 }
 
 void diskSize(systemArgs *args)
@@ -420,6 +461,25 @@ void diskSize(systemArgs *args)
     {
         USLOSS_Console("diskSize(): called.\n");
     }
+
+    int unit = (int) ((long) args->arg1);
+    if(unit < 0 || unit >= USLOSS_DISK_UNITS)
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+
+    int sector = -1;
+    int track = -1;
+    int disk = -1;
+
+    int result = diskSizeReal(unit, &sector, &track, &disk);
+
+    args->arg1 = (void*) ((long) sector);
+    args->arg2 = (void*) ((long) track);
+    args->arg3 = (void*) ((long) disk);
+    args->arg4 = (void*) ((long) result);
+
 }
 
 int diskSizeReal(int unit, int *sector, int *track, int *disk)
@@ -430,7 +490,7 @@ int diskSizeReal(int unit, int *sector, int *track, int *disk)
     }
 
     // Check params
-    if (unit != 0 && unit != 1)
+    if(unit < 0 || unit >= USLOSS_DISK_UNITS)
     {
         return -1;
     }

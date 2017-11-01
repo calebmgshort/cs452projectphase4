@@ -77,6 +77,7 @@ void blockOnMbox()
 void unblockByMbox(processPtr proc)
 {
     MboxSend(proc->privateMboxID, NULL, 0);
+    // TODO: Will this work every time? Should we use a 1 slot mailbox with a condSend?
 }
 
 /*
