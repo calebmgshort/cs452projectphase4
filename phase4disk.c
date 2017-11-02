@@ -1,0 +1,291 @@
+#include <usloss.h>
+#include <usyscall.h>
+#include <stdlib.h>
+
+#include "devices.h"
+#include "phase1.h"
+#include "phase4utility.h"
+#include "phase4disk.h"
+
+extern int debugflag4;
+extern process ProcTable[];
+
+// Pointers to the queue of disk operations
+processPtr DiskDriverQueue;
+processPtr NextDiskRequest;
+
+// Disk sizes (number of tracks)
+int DiskSizes[USLOSS_DISK_UNITS];
+
+void diskRead(systemArgs *args)
+{
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskRead(): called.\n");
+    }
+    void* memoryAddress = args->arg1;
+    int numSectorsToRead = (int) ((long) args->arg2);
+    int startDiskTrack = (int) ((long) args->arg3);
+    int startDiskSector = (int) ((long) args->arg4);
+    int unitNumToRead = (int) ((long) args->arg5);
+
+    // check for illegal input values
+    if(numSectorsToRead < 0 || numSectorsToRead >= DiskSizes[unitNumToRead])
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE)
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+
+    int result = diskReadReal(memoryAddress, numSectorsToRead, startDiskTrack,
+                              startDiskSector, unitNumToRead);
+
+    args->arg1 = (void*) ((long) result);
+    args->arg4 = (void *) 0;
+}
+
+int diskReadReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
+                 int startDiskSector, int unitNumToRead)
+{
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskReadReal(): called.\n");
+    }
+
+    // Put this into the disk driver queue and block
+    diskQueueAdd(DISK_READ, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead);
+    blockOnMbox();  // TODO: We still need to unblock this proc after it's finished on the queue
+    return 0;
+}
+
+void diskWrite(systemArgs *args)
+{
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskWrite(): called.\n");
+    }
+    void* memoryAddress = args->arg1;
+    int numSectorsToRead = (int) ((long) args->arg2);
+    int startDiskTrack = (int) ((long) args->arg3);
+    int startDiskSector = (int) ((long) args->arg4);
+    int unitNumToRead = (int) ((long) args->arg5);
+
+    // check for illegal input values
+    if(numSectorsToRead < 0 || numSectorsToRead >= DiskSizes[unitNumToRead])
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE)
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+    else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+
+    int result = diskWriteReal(memoryAddress, numSectorsToRead, startDiskTrack,
+                              startDiskSector, unitNumToRead);
+
+    args->arg1 = (void*) ((long) result);
+    args->arg4 = (void *) 0;
+}
+
+int diskWriteReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
+                 int startDiskSector, int unitNumToRead)
+{
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskWriteReal(): called.\n");
+    }
+    // Put this into the disk driver queue and block
+    diskQueueAdd(DISK_WRITE, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead);
+    blockOnMbox();
+    return 0;
+}
+
+void diskSize(systemArgs *args)
+{
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskSize(): called.\n");
+    }
+
+    int unit = (int) ((long) args->arg1);
+    if(unit < 0 || unit >= USLOSS_DISK_UNITS)
+    {
+        args->arg4 = (void*) -1;
+        return;
+    }
+
+    int sector = -1;
+    int track = -1;
+    int disk = -1;
+
+    int result = diskSizeReal(unit, &sector, &track, &disk);
+
+    args->arg1 = (void*) ((long) sector);
+    args->arg2 = (void*) ((long) track);
+    args->arg3 = (void*) ((long) disk);
+    args->arg4 = (void*) ((long) result);
+
+}
+
+int diskSizeReal(int unit, int *sector, int *track, int *disk)
+{
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskSizeReal(): called.\n");
+    }
+
+    // Check params
+    if(unit < 0 || unit >= USLOSS_DISK_UNITS)
+    {
+        return -1;
+    }
+
+    // Set the track and sector sizes
+    *track = USLOSS_DISK_TRACK_SIZE;
+    *sector = USLOSS_DISK_SECTOR_SIZE;
+    *disk = DiskSizes[unit];
+    return 0;
+}
+
+void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int startSector, int unit)
+{
+    processPtr proc = &ProcTable[getpid() % MAXPROC];
+    diskRequest *request = &proc->diskRequest;
+
+    request->op = op;
+    request->memAddress = memAddress;
+    request->numSectors = numSectors;
+    request->startTrack = startTrack;
+    request->startSector = startSector;
+    request->unit = unit;
+
+    if (DiskDriverQueue == NULL)
+    {
+        DiskDriverQueue = proc;
+    }
+    else if (compareRequests(&(DiskDriverQueue->diskRequest), &(proc->diskRequest)) > 0)
+    {
+        proc->nextDiskQueueProc = DiskDriverQueue;
+        DiskDriverQueue = proc;
+    }
+    else
+    {
+        processPtr current = DiskDriverQueue;
+        processPtr next = current->nextDiskQueueProc;
+        while (next != NULL && compareRequests(&(proc->diskRequest), &(current->diskRequest)) > 0)
+        {
+            current = next;
+            next = next->nextDiskQueueProc;
+        }
+        current->nextDiskQueueProc = proc;
+        proc->nextDiskQueueProc = next;
+    }
+}
+
+/*
+ * Returns a pointer to the next disk request to process. Cleans the next
+ * pointer on the returned process. Removes the returned process from the queue
+ */
+processPtr dequeueDiskRequest()
+{
+    // Return null when the queue is empty
+    if (DiskDriverQueue == NULL)
+    {
+        return NULL;
+    }
+
+    // Initialize next request on first call
+    if (NextDiskRequest == NULL)
+    {
+        NextDiskRequest = DiskDriverQueue;
+    }
+
+    // Get the request to dequeue and update
+    processPtr ret = NextDiskRequest;
+    NextDiskRequest = NextDiskRequest->nextDiskQueueProc;
+    if (NextDiskRequest == NULL)
+    {
+        NextDiskRequest = DiskDriverQueue;
+    }
+
+    // Search for the parent of the request to dequeue and remove
+    if (ret != DiskDriverQueue)
+    {
+        processPtr parent = DiskDriverQueue;
+        while (parent->nextDiskQueueProc != ret)
+        {
+            parent = parent->nextDiskQueueProc;
+        }
+
+        // Remove ret
+        parent->nextDiskQueueProc = ret->nextDiskQueueProc;
+    }
+    else
+    {
+        DiskDriverQueue = ret->nextDiskQueueProc;
+    }
+
+    ret->nextDiskQueueProc = NULL;
+    return ret;
+}
+
+void performDiskOp(processPtr proc, int opType)
+{
+    diskRequest request = proc->diskRequest;
+
+    // Seek to the given track
+    USLOSS_DeviceRequest uslossRequest;
+    uslossRequest.opr = USLOSS_DISK_SEEK;
+    uslossRequest.reg1 = (void *) ((long) request.startTrack);
+    int result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, request.unit, &uslossRequest);
+    if (result != USLOSS_DEV_OK)
+    {
+        USLOSS_Console("readFromDisk(): Error in seeking.\n");
+        USLOSS_Halt(1);
+    }
+
+    // Read from the given track
+    for (int i = 0; i < request.numSectors; i++)
+    {
+        if (request.startSector + i > USLOSS_DISK_TRACK_SIZE)
+        {
+            USLOSS_Console("Error: sector overflow.\n");
+        }
+        uslossRequest.opr = opType;
+        uslossRequest.reg1 = (void *) ((long) request.startSector + i);
+        uslossRequest.reg2 = request.memAddress + USLOSS_DISK_SECTOR_SIZE * i;
+        result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, request.unit, &uslossRequest);
+        if (result != USLOSS_DEV_OK)
+        {
+            USLOSS_Console("readFromDisk(): Error in reading/writing.\n");
+            USLOSS_Halt(1);
+        }
+    }
+}
+

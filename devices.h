@@ -9,6 +9,7 @@ typedef struct process * processPtr;
 typedef struct diskRequest diskRequest;
 
 typedef int semaphore;
+typedef USLOSS_Sysargs systemArgs;
 
 struct diskRequest
 {

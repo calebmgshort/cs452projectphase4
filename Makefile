@@ -8,14 +8,14 @@ ASSIGNMENT = 452phase4
 CC = gcc
 AR = ar
 
-COBJS = phase4.o phase4utility.o libuser.o
+COBJS = phase4.o phase4utility.o libuser.o phase4clock.o phase4disk.o phase4term.o
 CSRCS = ${COBJS:.o=.c}
 
 PHASE1LIB = patrickphase1
 PHASE2LIB = patrickphase2
 PHASE3LIB = patrickphase3
 
-HDRS = providedPrototypes.h libuser.h devices.h phase4utility.h phase1.h phase2.h phase3.h phase4.h
+HDRS = providedPrototypes.h libuser.h devices.h phase4utility.h phase1.h phase2.h phase3.h phase4.h phase4clock.h phase4disk.h phase4term.h
 
 INCLUDE = ${PREFIX}/include
 

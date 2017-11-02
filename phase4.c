@@ -10,6 +10,9 @@
 #include "devices.h"
 #include "providedPrototypes.h"
 #include "phase4utility.h"
+#include "phase4clock.h"
+#include "phase4disk.h"
+#include "phase4term.h"
 
 // Debugging flag
 int debugflag4 = 1;
@@ -22,31 +25,11 @@ static int ClockDriver(char *);
 static int DiskDriver(char *);
 static int TermDriver(char *);
 
-// Syscall handler prototypes
-void sleep(systemArgs *);
-void diskRead(systemArgs *);
-void diskWrite(systemArgs *);
-void diskSize(systemArgs *);
-void termRead(systemArgs *);
-void termWrite(systemArgs *);
-
-int sleepReal(int);
-int diskReadReal(void*, int, int, int, int);
-int diskWriteReal(void*, int, int, int, int);
-int diskSizeReal(int, int *, int *, int *);
-void termReadReal();
-void termWriteReal();
-
 // Phase 4 proc table
 process ProcTable[MAXPROC];
 
-// Driver queues
-processPtr ClockDriverQueue = NULL;
-processPtr DiskDriverQueue = NULL;
-processPtr NextDiskRequest = NULL;
 
-// Disk sizes (number of tracks)
-int DiskSizes[USLOSS_DISK_UNITS];
+extern int DiskSizes[];
 
 int start3(char *args)
 {
@@ -56,7 +39,6 @@ int start3(char *args)
     }
 
     char name[128];
-    // char termbuf[10];
     int clockPID;
     int diskPIDs[USLOSS_DISK_UNITS];
     int termPIDs[USLOSS_TERM_UNITS];
@@ -86,7 +68,7 @@ int start3(char *args)
     for (int i = 0; i < MAXPROC; i++)
     {
         ProcTable[i].pid = EMPTY;
-        ProcTable[i].privateMboxID = MboxCreate(0, MAX_MESSAGE);  // TODO: Will this work every time? Should we use a 1 slot mailbox with a condSend?
+        ProcTable[i].privateMboxID = MboxCreate(0, MAX_MESSAGE);
         ProcTable[i].nextProc = NULL;
         ProcTable[i].blockStartTime = -1;
         ProcTable[i].sleepTime = -1;
@@ -176,9 +158,7 @@ int start3(char *args)
     zap(clockPID);
     for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
-        if (0)
-            USLOSS_Console("%d", diskPIDs[i]);
-        // zap(diskPIDs[i]);
+        zap(diskPIDs[i]);
     }
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
@@ -197,21 +177,23 @@ int start3(char *args)
  */
 static int ClockDriver(char *arg)
 {
-    if(DEBUG4 && debugflag4)
+    if (DEBUG4 && debugflag4)
     {
         USLOSS_Console("ClockDriver(): called.\n");
     }
+
     // Let the parent know we are running and enable interrupts.
     semvReal(running);
     enableInterrupts();
 
     // Infinite loop until we are zap'd
     int status;
-    while(!isZapped())
+    while (!isZapped())
     {
         int result = waitDevice(USLOSS_CLOCK_DEV, 0, &status);
         if (result != 0)
         {
+            // We were zapped while waiting
             return 0;
         }
 
@@ -257,10 +239,10 @@ static int DiskDriver(char *arg)
         {
             int status;
             int result = waitDevice(USLOSS_DISK_DEV, unit, &status);
-            if (result != USLOSS_DEV_OK)
+            if (result != 0)
             {
-                USLOSS_Console("DiskDriver(): Could not wait.\n");
-                USLOSS_Halt(1);
+                // We were zapped while waiting
+                return 0;
             }
             continue;
         }
@@ -291,245 +273,49 @@ static int TermDriver(char *arg)
     {
         USLOSS_Console("TermDriver(): called.\n");
     }
+
+    // Enable interrupts and tell parent that we're running
     semvReal(running);
-    return 0; // TODO
-}
+    enableInterrupts();
 
-void sleep(systemArgs *args)
-{
-    if(DEBUG4 && debugflag4)
+    // Get the unit number associated with this driver
+    int unit = atoi(arg);
+
+    while (!isZapped())
     {
-        USLOSS_Console("sleep(): called.\n");
-    }
-    // Unpack args
-    int secs = (int) ((long) args->arg1);
+        int status;
+        int result = waitDevice(USLOSS_TERM_DEV, unit, &status);
 
-    // Defer to sleepReal
-    long result = sleepReal(secs);
+        int recvStatus; // TODO unpack from status
+        if (recvStatus == USLOSS_DEV_BUSY)
+        {
+            char character; // TODO unpack from status
+            // TODO receive the char
+        }
+        else if (recvStatus == USLOSS_DEV_ERROR)
+        {
+            // An unspecified error has occured
+            USLOSS_Console("TermDriver(): Error in terminal %d status register.\n", unit);
+            USLOSS_Halt(1);
+        }
 
-    // Put return values in args
-    args->arg4 = (void *) result;
-
-    // Set to user mode
-    setToUserMode();
-}
-
-int sleepReal(int secs)
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("sleepReal(): called.\n");
-    }
-    // Check args
-    if (secs < 0)
-    {
-        return -1;
-    }
-
-    // Put an entry in the clock driver queue
-    addProcToClockQueue(&ProcTable[getpid() % MAXPROC]);
-
-    // Set the sleep time in the process table
-    ProcTable[getpid() % MAXPROC].sleepTime = secs;
-
-    if (DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("sleepReal(): About to block process %d.\n", getpid());
+        int xmitStatus; // TODO unpack from status
+        if (xmitStatus == USLOSS_DEV_READY)
+        {
+            // Send a char
+            unsigned int control = 0;
+            // TODO set the character bits
+            // TODO set the send char flag
+            // TODO set the recv int enable flag
+            // TODO determine if we should set the xmit int enable flag
+        }
+        else if (xmitStatus == USLOSS_DEV_ERROR)
+        {
+            // An unspecified error has occured
+            USLOSS_Console("TermDriver(): Error in terminal %d status register.\n", unit);
+            USLOSS_Halt(1);
+        }
     }
 
-    // Block this process
-    blockOnMbox();
-
-    // The clock driver will unblock us when appropriate
-
-    // Return the result
     return 0;
-}
-
-void diskRead(systemArgs *args)
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("diskRead(): called.\n");
-    }
-    void* memoryAddress = args->arg1;
-    int numSectorsToRead = (int) ((long) args->arg2);
-    int startDiskTrack = (int) ((long) args->arg3);
-    int startDiskSector = (int) ((long) args->arg4);
-    int unitNumToRead = (int) ((long) args->arg5);
-
-    // check for illegal input values
-    if(numSectorsToRead < 0 || numSectorsToRead >= DiskSizes[unitNumToRead])
-    {
-        args->arg4 = (void*) -1;
-        return;
-    }
-    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
-    {
-        args->arg4 = (void*) -1;
-        return;
-    }
-    else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE)
-    {
-        args->arg4 = (void*) -1;
-        return;
-    }
-    else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
-    {
-        args->arg4 = (void*) -1;
-        return;
-    }
-
-    int result = diskReadReal(memoryAddress, numSectorsToRead, startDiskTrack,
-                              startDiskSector, unitNumToRead);
-
-    args->arg1 = (void*) ((long) result);
-    args->arg4 = (void *) 0;
-}
-
-int diskReadReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
-                 int startDiskSector, int unitNumToRead)
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("diskReadReal(): called.\n");
-    }
-
-    // Put this into the disk driver queue and block
-    diskQueueAdd(DISK_READ, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead);
-    blockOnMbox();  // TODO: We still need to unblock this proc after it's finished on the queue
-    return 0;
-}
-
-void diskWrite(systemArgs *args)
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("diskWrite(): called.\n");
-    }
-    void* memoryAddress = args->arg1;
-    int numSectorsToRead = (int) ((long) args->arg2);
-    int startDiskTrack = (int) ((long) args->arg3);
-    int startDiskSector = (int) ((long) args->arg4);
-    int unitNumToRead = (int) ((long) args->arg5);
-
-    // check for illegal input values
-    if(numSectorsToRead < 0 || numSectorsToRead >= DiskSizes[unitNumToRead])
-    {
-        args->arg4 = (void*) -1;
-        return;
-    }
-    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
-    {
-        args->arg4 = (void*) -1;
-        return;
-    }
-    else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE)
-    {
-        args->arg4 = (void*) -1;
-        return;
-    }
-    else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
-    {
-        args->arg4 = (void*) -1;
-        return;
-    }
-
-    int result = diskWriteReal(memoryAddress, numSectorsToRead, startDiskTrack,
-                              startDiskSector, unitNumToRead);
-
-    args->arg1 = (void*) ((long) result);
-    args->arg4 = (void *) 0;
-}
-
-int diskWriteReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
-                 int startDiskSector, int unitNumToRead)
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("diskWriteReal(): called.\n");
-    }
-    // Put this into the disk driver queue and block
-    diskQueueAdd(DISK_WRITE, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead);
-    blockOnMbox();
-    return 0;
-}
-
-void diskSize(systemArgs *args)
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("diskSize(): called.\n");
-    }
-
-    int unit = (int) ((long) args->arg1);
-    if(unit < 0 || unit >= USLOSS_DISK_UNITS)
-    {
-        args->arg4 = (void*) -1;
-        return;
-    }
-
-    int sector = -1;
-    int track = -1;
-    int disk = -1;
-
-    int result = diskSizeReal(unit, &sector, &track, &disk);
-
-    args->arg1 = (void*) ((long) sector);
-    args->arg2 = (void*) ((long) track);
-    args->arg3 = (void*) ((long) disk);
-    args->arg4 = (void*) ((long) result);
-
-}
-
-int diskSizeReal(int unit, int *sector, int *track, int *disk)
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("diskSizeReal(): called.\n");
-    }
-
-    // Check params
-    if(unit < 0 || unit >= USLOSS_DISK_UNITS)
-    {
-        return -1;
-    }
-
-    // Set the track and sector sizes
-    *track = USLOSS_DISK_TRACK_SIZE;
-    *sector = USLOSS_DISK_SECTOR_SIZE;
-    *disk = DiskSizes[unit];
-    return 0;
-}
-
-void termRead(systemArgs *args)
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("termRead(): called.\n");
-    }
-}
-
-void termReadReal()
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("termReadReal(): called.\n");
-    }
-}
-
-void termWrite(systemArgs *args)
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("termWrite(): called.\n");
-    }
-}
-
-void termWriteReal()
-{
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("termWriteReal(): called.\n");
-    }
 }

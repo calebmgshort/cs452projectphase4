@@ -1,6 +1,4 @@
-#include <stddef.h>
 #include <usloss.h>
-#include "devices.h"
 
 extern int debugflag4;
 
