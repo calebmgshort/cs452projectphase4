@@ -19,6 +19,14 @@ void sleep(systemArgs *args)
     {
         USLOSS_Console("sleep(): called.\n");
     }
+
+    // Check the syscall number
+    if (arg->number != SYS_SLEEP)
+    {
+        USLOSS_Console("sleep(): Called with wrong syscall number.\n");
+        USLOSS_Halt(1);
+    }
+
     // Unpack args
     int secs = (int) ((long) args->arg1);
 

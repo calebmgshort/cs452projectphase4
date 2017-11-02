@@ -17,12 +17,25 @@ processPtr NextDiskRequest;
 // Disk sizes (number of tracks)
 int DiskSizes[USLOSS_DISK_UNITS];
 
+// TODO: Check syscall number in all syscall handlers
+// TODO: Set to user mode in all syscall handlers
+// TODO: Check that return values match spec
+
 void diskRead(systemArgs *args)
 {
     if(DEBUG4 && debugflag4)
     {
         USLOSS_Console("diskRead(): called.\n");
     }
+
+    // Check the syscall number
+    if (arg->number != SYS_DISKREAD)
+    {
+        USLOSS_Console("diskRead(): Called with wrong syscall number.\n");;
+        USLOSS_Halt(1);
+    }
+
+    // Unpack the args
     void* memoryAddress = args->arg1;
     int numSectorsToRead = (int) ((long) args->arg2);
     int startDiskTrack = (int) ((long) args->arg3);

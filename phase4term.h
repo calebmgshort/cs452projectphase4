@@ -6,7 +6,7 @@
 extern void termRead(systemArgs *);
 extern void termWrite(systemArgs *);
 
-extern void termReadReal();
-extern void termWriteReal();
+extern int termReadReal(int, int, char *);
+extern int termWriteReal(int, int, char *);
 
 #endif
