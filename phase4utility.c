@@ -87,7 +87,13 @@ void clearProcRequest(processPtr proc)
 
 void clearProc(processPtr proc)
 {
-    
+    proc->pid = EMPTY;
+    proc->nextProc = NULL;
+    proc->blockStartTime = -1;
+    proc->sleepTime = -1;
+    proc->nextDiskQueueProc = NULL;
+
+    clearProcRequest(proc);    
 }
 
 int compareRequests(diskRequest *req1, diskRequest *req2)

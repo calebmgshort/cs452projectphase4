@@ -83,7 +83,10 @@ int diskReadReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
     // Put this into the disk driver queue and block
     diskQueueAdd(DISK_READ, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead);
     blockOnMbox();  // TODO: We still need to unblock this proc after it's finished on the queue
-    return 0;
+    processPtr proc = &ProcTable[getpid() % MAXPROC];
+    int status = proc->diskRequest.resultStatus;
+    clearProc(proc);
+    return status;
 }
 
 void diskWrite(systemArgs *args)
@@ -137,7 +140,11 @@ int diskWriteReal(void* memoryAddress, int numSectorsToRead, int startDiskTrack,
     // Put this into the disk driver queue and block
     diskQueueAdd(DISK_WRITE, memoryAddress, numSectorsToRead, startDiskTrack, startDiskSector, unitNumToRead);
     blockOnMbox();
-    return 0;
+
+    processPtr proc = &ProcTable[getpid() % MAXPROC];
+    int status = proc->diskRequest.resultStatus;
+    clearProc(proc);
+    return status;
 }
 
 void diskSize(systemArgs *args)

@@ -66,11 +66,9 @@ int start3(char *args)
     }
     for (int i = 0; i < MAXPROC; i++)
     {
-        ProcTable[i].pid = EMPTY;
-        ProcTable[i].privateMboxID = MboxCreate(0, MAX_MESSAGE);
-        ProcTable[i].nextProc = NULL;
-        ProcTable[i].blockStartTime = -1;
-        ProcTable[i].sleepTime = -1;
+        processPtr proc = &ProcTable[i % MAXPROC];
+        clearProc(proc);
+        proc->privateMboxID = MboxCreate(0, MAX_MESSAGE);
     }
 
     // Create clock device driver
