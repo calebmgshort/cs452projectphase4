@@ -19,6 +19,7 @@ struct diskRequest
     int startSector;
     int startTrack;
     int unit;
+    int resultStatus;
 };
 
 struct process
@@ -37,7 +38,7 @@ struct process
 };
 
 #define EMPTY -1
-#define DISK_READ 0
-#define DISK_WRITE 1
+#define DISK_READ  USLOSS_DISK_READ 
+#define DISK_WRITE USLOSS_DISK_WRITE
 
 #endif

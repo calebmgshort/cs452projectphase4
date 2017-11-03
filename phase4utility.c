@@ -82,6 +82,12 @@ void clearProcRequest(processPtr proc)
     proc->diskRequest.startTrack = EMPTY;
     proc->diskRequest.startSector = EMPTY;
     proc->diskRequest.unit = EMPTY;
+    proc->diskRequest.resultStatus = 0;
+}
+
+void clearProc(processPtr proc)
+{
+    
 }
 
 int compareRequests(diskRequest *req1, diskRequest *req2)

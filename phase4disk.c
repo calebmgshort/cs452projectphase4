@@ -9,6 +9,7 @@
 
 extern int debugflag4;
 extern process ProcTable[];
+extern int diskPIDs[];
 
 // Pointers to the queue of disk operations
 processPtr DiskDriverQueue;
@@ -219,6 +220,9 @@ void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int 
         current->nextDiskQueueProc = proc;
         proc->nextDiskQueueProc = next;
     }
+
+    processPtr diskDriver = ProcTable[diskPIDs[unit] * MAXPROC];
+    unblockByMbox(diskDriver);    
 }
 
 /*
@@ -268,30 +272,40 @@ processPtr dequeueDiskRequest()
     return ret;
 }
 
-void performDiskOp(processPtr proc, int opType)
+int performDiskOp(processPtr proc)
 {
     diskRequest request = proc->diskRequest;
 
     // Seek to the given track
-    USLOSS_DeviceRequest uslossRequest;
-    uslossRequest.opr = USLOSS_DISK_SEEK;
-    uslossRequest.reg1 = (void *) ((long) request.startTrack);
-    int result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, request.unit, &uslossRequest);
-    if (result != USLOSS_DEV_OK)
+    int result = seekTrack(request.unit, request.startTrack);
+    if (result != 0)
     {
-        USLOSS_Console("readFromDisk(): Error in seeking.\n");
-        USLOSS_Halt(1);
+        return result;
     }
 
-    // Read from the given track
+    // Read/Write from the given track
+    int currentTrack = request.startTrack;
     for (int i = 0; i < request.numSectors; i++)
     {
-        if (request.startSector + i > USLOSS_DISK_TRACK_SIZE)
+        // Assume sectors start from 0
+
+        int sector = request.startSector + i;
+        int overflow = sector / USLOSS_DISK_TRACK_SIZE;
+        sector = sector % USLOSS_DISK_TRACK_SIZE;
+        int track = request.startTrack + overflow
+        if (track != currentTrack)
         {
-            USLOSS_Console("Error: sector overflow.\n");
+            result = seekTrack(request.unit, track);
+            if (result != 0)
+            {
+                return result;
+            }
+            currentTrack = track;
         }
-        uslossRequest.opr = opType;
-        uslossRequest.reg1 = (void *) ((long) request.startSector + i);
+
+        // Send the disk a read/write request
+        USLOSS_DeviceRequest uslossRequest.opr = request.op;
+        uslossRequest.reg1 = (void *) ((long) sector);
         uslossRequest.reg2 = request.memAddress + USLOSS_DISK_SECTOR_SIZE * i;
         result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, request.unit, &uslossRequest);
         if (result != USLOSS_DEV_OK)
@@ -299,6 +313,40 @@ void performDiskOp(processPtr proc, int opType)
             USLOSS_Console("readFromDisk(): Error in reading/writing.\n");
             USLOSS_Halt(1);
         }
+
+        // Wait for the request to finish
+        int status;
+        result = waitDevice(USLOSS_DISK_DEV, request.unit, &status);
+        if (result != 0)
+        {
+            return result;
+        }
+
+        if (status == USLOSS_DEV_ERROR)
+        {
+            // Inform the proc of the error
+            proc->diskRequest.resultStatus = status;
+            return 0;
+        }
     }
+
+    return 0;
 }
 
+int seekTrack(int unit, int track)
+{
+    // Send the disk a seek request
+    USLOSS_DeviceRequest request;
+    request.opr = USLOSS_DISK_SEEK;
+    request.reg1 = (void *) ((long) track);
+    int result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, request.unit, &request);
+    if (result != USLOSS_DEV_OK)
+    {
+        USLOSS_Console("seekTrack(): Error in seeking.\n");
+        USLOSS_Halt(1);
+    }
+
+    // Wait for the seek to be finished
+    int status;
+    return waitDevice(USLOSS_DISK_DEV, unit, &status);
+}

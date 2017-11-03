@@ -27,7 +27,7 @@ static int TermDriver(char *);
 
 // Phase 4 proc table
 process ProcTable[MAXPROC];
-
+int diskPIDs[USLOSS_DISK_UNITS];
 
 extern int DiskSizes[];
 
@@ -40,7 +40,6 @@ int start3(char *args)
 
     char name[128];
     int clockPID;
-    int diskPIDs[USLOSS_DISK_UNITS];
     int termPIDs[USLOSS_TERM_UNITS];
     int	status;
     char buf[10];
@@ -237,27 +236,21 @@ static int DiskDriver(char *arg)
         processPtr requestProc = dequeueDiskRequest();
         if (requestProc == NULL)
         {
-            int status;
-            int result = waitDevice(USLOSS_DISK_DEV, unit, &status);
-            if (result != 0)
+            // Block and wait for a request to come in
+            blockOnMbox();
+
+            // Once we've awoken, a request should exist
+            requestProc = dequeueDiskRequest();
+            if (requestProc == NULL)
             {
-                // We were zapped while waiting
-                return 0;
+                USLOSS_Console("DiskDriver(): Awoken without a request.\n");
+                USLOSS_Halt(1);
             }
-            continue;
         }
-        if (requestProc->diskRequest.op == DISK_READ)
-        {
-            performDiskOp(requestProc, USLOSS_DISK_READ);
-        }
-        else if (requestProc->diskRequest.op == DISK_WRITE)
-        {
-            performDiskOp(requestProc, USLOSS_DISK_WRITE);
-        }
-        else
-        {
-            USLOSS_Console("DiskDriver(): Invalid disk request %d.\n");
-        }
+
+        // Perform the request
+        performDiskOp(requestProc);
+        
         // Unblock the process that requested the disk operation
         unblockByMbox(requestProc);
     }
