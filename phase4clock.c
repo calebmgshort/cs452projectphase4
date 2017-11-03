@@ -21,7 +21,7 @@ void sleep(systemArgs *args)
     }
 
     // Check the syscall number
-    if (arg->number != SYS_SLEEP)
+    if (args->number != SYS_SLEEP)
     {
         USLOSS_Console("sleep(): Called with wrong syscall number.\n");
         USLOSS_Halt(1);

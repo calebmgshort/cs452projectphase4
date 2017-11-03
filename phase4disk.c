@@ -29,7 +29,7 @@ void diskRead(systemArgs *args)
     }
 
     // Check the syscall number
-    if (arg->number != SYS_DISKREAD)
+    if (args->number != SYS_DISKREAD)
     {
         USLOSS_Console("diskRead(): Called with wrong syscall number.\n");;
         USLOSS_Halt(1);
