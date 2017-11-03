@@ -1,6 +1,8 @@
 #include <usloss.h>
 #include <usyscall.h>
 #include "devices.h"
+#include "phase4utility.h"
+#include "phase4term.h"
 
 extern int debugflag4;
 
@@ -48,6 +50,7 @@ int termReadReal(int unit, int size, char *buffer)
     {
         USLOSS_Console("termReadReal(): called.\n");
     }
+    return -1;
 }
 
 void termWrite(systemArgs *args)
@@ -94,4 +97,5 @@ int termWriteReal(int unit, int size, char *text)
     {
         USLOSS_Console("termWriteReal(): called.\n");
     }
+    return -1;
 }
