@@ -4,6 +4,7 @@
 
 #include "devices.h"
 #include "phase1.h"
+#include "phase2.h"
 #include "phase4utility.h"
 #include "phase4disk.h"
 
@@ -228,8 +229,8 @@ void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int 
         proc->nextDiskQueueProc = next;
     }
 
-    processPtr diskDriver = ProcTable[diskPIDs[unit] * MAXPROC];
-    unblockByMbox(diskDriver);    
+    processPtr diskDriver = &ProcTable[diskPIDs[unit] * MAXPROC];
+    unblockByMbox(diskDriver);
 }
 
 /*
@@ -299,7 +300,7 @@ int performDiskOp(processPtr proc)
         int sector = request.startSector + i;
         int overflow = sector / USLOSS_DISK_TRACK_SIZE;
         sector = sector % USLOSS_DISK_TRACK_SIZE;
-        int track = request.startTrack + overflow
+        int track = request.startTrack + overflow;
         if (track != currentTrack)
         {
             result = seekTrack(request.unit, track);
@@ -311,7 +312,8 @@ int performDiskOp(processPtr proc)
         }
 
         // Send the disk a read/write request
-        USLOSS_DeviceRequest uslossRequest.opr = request.op;
+        USLOSS_DeviceRequest uslossRequest;
+        uslossRequest.opr = request.op;
         uslossRequest.reg1 = (void *) ((long) sector);
         uslossRequest.reg2 = request.memAddress + USLOSS_DISK_SECTOR_SIZE * i;
         result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, request.unit, &uslossRequest);
@@ -346,7 +348,7 @@ int seekTrack(int unit, int track)
     USLOSS_DeviceRequest request;
     request.opr = USLOSS_DISK_SEEK;
     request.reg1 = (void *) ((long) track);
-    int result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, request.unit, &request);
+    int result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, &request);
     if (result != USLOSS_DEV_OK)
     {
         USLOSS_Console("seekTrack(): Error in seeking.\n");

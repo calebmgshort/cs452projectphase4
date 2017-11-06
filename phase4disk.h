@@ -11,8 +11,9 @@ extern int diskReadReal(void *, int, int, int, int);
 extern int diskWriteReal(void *, int, int, int, int);
 extern int diskSizeReal(int, int *, int *, int *);
 
-extern void performDiskOp(processPtr);
+extern int performDiskOp(processPtr);
 extern void diskQueueAdd(int, void*, int, int, int, int);
 extern processPtr dequeueDiskRequest();
+extern int seekTrack(int, int);
 
 #endif

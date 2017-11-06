@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "phase1.h"
+#include "phase2.h"
 #include "devices.h"
 #include "providedPrototypes.h"
 #include "phase4utility.h"
@@ -97,6 +99,7 @@ int start3(char *args)
         sprintf(buf, "%d", i);
         int pid = fork1(name, DiskDriver, buf, USLOSS_MIN_STACK, 2);
         diskPIDs[i] = pid;
+        USLOSS_Console("start3(): diskPID%d=%d\n", i, pid);
         if (pid < 0)
         {
             USLOSS_Console("start3(): Can't create term driver %d\n", i);
@@ -142,27 +145,26 @@ int start3(char *args)
     }
     pid = waitReal(&status);
 
-    for (int i = 0; i < 6; i++)
-    {
-        waitReal(&status);
-    }
-
     // Zap the device drivers
     if (DEBUG4 && debugflag4)
     {
         USLOSS_Console("start3(): Zapping device drivers.\n");
     }
     zap(clockPID);
+    USLOSS_Console("start3(): Now zapping disks.\n");
     for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
+        USLOSS_Console("start3(): zapping diskPID%d=%d\n", i, diskPIDs[i]);
         zap(diskPIDs[i]);
     }
+    USLOSS_Console("start3(): Now zapping terms.\n");
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
         if (0)
             USLOSS_Console("%d", termPIDs[i]);
-        // zap(termPIDs[i]);
+        zap(termPIDs[i]);
     }
+    USLOSS_Console("start3(): Finished zapping.\n");
 
     // Quit
     quit(0);
@@ -234,8 +236,16 @@ static int DiskDriver(char *arg)
         processPtr requestProc = dequeueDiskRequest();
         if (requestProc == NULL)
         {
+            if(DEBUG4 && debugflag4)
+            {
+                USLOSS_Console("DiskDriver(): There is nothing to do, blocking.\n");
+            }
             // Block and wait for a request to come in
             blockOnMbox();
+            if(DEBUG4 && debugflag4)
+            {
+                USLOSS_Console("DiskDriver(): Unblocked in the if loop.\n");
+            }
 
             // Once we've awoken, a request should exist
             requestProc = dequeueDiskRequest();
@@ -248,7 +258,7 @@ static int DiskDriver(char *arg)
 
         // Perform the request
         performDiskOp(requestProc);
-        
+
         // Unblock the process that requested the disk operation
         unblockByMbox(requestProc);
     }

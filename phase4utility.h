@@ -8,6 +8,7 @@ extern void setToUserMode();
 extern void blockOnMbox();
 extern void unblockByMbox(processPtr);
 extern void clearProcRequest(processPtr);
+extern void clearProc(processPtr);
 extern int compareRequests(diskRequest *, diskRequest *);
 
 #endif
