@@ -38,7 +38,9 @@ struct process
 };
 
 #define EMPTY -1
-#define DISK_READ  USLOSS_DISK_READ 
+#define DISK_READ  USLOSS_DISK_READ
 #define DISK_WRITE USLOSS_DISK_WRITE
+#define TRUE 1
+#define FALSE 0
 
 #endif

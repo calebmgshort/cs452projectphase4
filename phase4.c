@@ -17,7 +17,7 @@
 #include "phase4term.h"
 
 // Debugging flag
-int debugflag4 = 1;
+int debugflag4 = 0;
 
 // Semaphore used to create drivers
 semaphore running;
@@ -73,8 +73,9 @@ int start3(char *args)
         proc->privateMboxID = MboxCreate(0, MAX_MESSAGE);
     }
 
-    // Create clock device driver
     running = semcreateReal(0);
+
+    // Create clock device driver
     if (DEBUG4 && debugflag4)
     {
         USLOSS_Console("start3(): Creating clock device driver.\n");
@@ -99,7 +100,6 @@ int start3(char *args)
         sprintf(buf, "%d", i);
         int pid = fork1(name, DiskDriver, buf, USLOSS_MIN_STACK, 2);
         diskPIDs[i] = pid;
-        USLOSS_Console("start3(): diskPID%d=%d\n", i, pid);
         if (pid < 0)
         {
             USLOSS_Console("start3(): Can't create term driver %d\n", i);
@@ -111,7 +111,7 @@ int start3(char *args)
     }
 
     // May be other stuff to do here before going on to terminal drivers
-
+    /*
     // Create terminal device drivers
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
@@ -131,7 +131,7 @@ int start3(char *args)
         // Wait for the driver to start
         sempReal(running);
     }
-
+    */
     // Create first user-level process and wait for it to finish.
     if (DEBUG4 && debugflag4)
     {
@@ -151,12 +151,35 @@ int start3(char *args)
         USLOSS_Console("start3(): Zapping device drivers.\n");
     }
     zap(clockPID);
-    USLOSS_Console("start3(): Now zapping disks.\n");
     for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
-        USLOSS_Console("start3(): zapping diskPID%d=%d\n", i, diskPIDs[i]);
+        unblockProc(diskPIDs[i]);
         zap(diskPIDs[i]);
+        /*
+        processPtr diskProcess = &ProcTable[diskPIDs[i]];
+        char message[] = "quit";
+        void* messagePtr = (void*) &message;
+        USLOSS_Console("DiskDriver(): Doing a send to mailbox %d.\n", diskProcess->privateMboxID);
+        int sendResult = MboxCondSend(diskProcess->privateMboxID, messagePtr, 10);
+        if(sendResult == -1)
+        {
+          USLOSS_Console("start3(): invalid.\n");
+          USLOSS_Halt(1);
+        }
+        if(sendResult == 1) // Message not sent
+        {
+            USLOSS_Console("start3(): The mailbox was not blocked. Zapping disk %d.\n", i);
+            zap(diskPIDs[i]);
+        }
+        else{
+            USLOSS_Console("start3(): The mailbox was blocked. Disk %d should quit.\n", i);
+            dumpProcesses();
+            // Wait for the disk driver to finish
+            join
+        }
+        */
     }
+    /*
     USLOSS_Console("start3(): Now zapping terms.\n");
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
@@ -164,7 +187,8 @@ int start3(char *args)
             USLOSS_Console("%d", termPIDs[i]);
         zap(termPIDs[i]);
     }
-    USLOSS_Console("start3(): Finished zapping.\n");
+    */
+    //USLOSS_Console("start3(): Finished zapping.\n");
 
     // Quit
     quit(0);
@@ -242,11 +266,32 @@ static int DiskDriver(char *arg)
             }
             // Block and wait for a request to come in
             blockOnMbox();
-            if(DEBUG4 && debugflag4)
+            if(isZapped())
             {
-                USLOSS_Console("DiskDriver(): Unblocked in the if loop.\n");
+                return 0;
             }
-
+            /*
+            processPtr currentProc = &ProcTable[getpid() % MAXPROC];
+            int msgSize = 10;
+            char message[msgSize];
+            void* messageBuf = (void*) &message;
+            USLOSS_Console("DiskDriver(): Doing a receive on mailbox %d.\n", currentProc->privateMboxID);
+            int receiveResult = MboxReceive(currentProc->privateMboxID, messageBuf, msgSize);
+            USLOSS_Console("DiskDriver(): Unblocked in the if loop.\n");
+            if(receiveResult == -1)
+            {
+              USLOSS_Console("DiskDriver(): Receive called with invalid args.\n");
+              USLOSS_Halt(1);
+            }
+            if(receiveResult > 0) // There was a message of size > 0
+            {
+                dumpProcesses();
+                USLOSS_Console("DiskDriver(): Raising semaphore.\n");
+                // Allow start3 to finish and quit
+                USLOSS_Console("DiskDriver(): Now quiting.\n");
+                quit(0);
+            }
+            */
             // Once we've awoken, a request should exist
             requestProc = dequeueDiskRequest();
             if (requestProc == NULL)
