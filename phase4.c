@@ -155,29 +155,6 @@ int start3(char *args)
     {
         unblockProc(diskPIDs[i]);
         zap(diskPIDs[i]);
-        /*
-        processPtr diskProcess = &ProcTable[diskPIDs[i]];
-        char message[] = "quit";
-        void* messagePtr = (void*) &message;
-        USLOSS_Console("DiskDriver(): Doing a send to mailbox %d.\n", diskProcess->privateMboxID);
-        int sendResult = MboxCondSend(diskProcess->privateMboxID, messagePtr, 10);
-        if(sendResult == -1)
-        {
-          USLOSS_Console("start3(): invalid.\n");
-          USLOSS_Halt(1);
-        }
-        if(sendResult == 1) // Message not sent
-        {
-            USLOSS_Console("start3(): The mailbox was not blocked. Zapping disk %d.\n", i);
-            zap(diskPIDs[i]);
-        }
-        else{
-            USLOSS_Console("start3(): The mailbox was blocked. Disk %d should quit.\n", i);
-            dumpProcesses();
-            // Wait for the disk driver to finish
-            join
-        }
-        */
     }
     /*
     USLOSS_Console("start3(): Now zapping terms.\n");
@@ -270,28 +247,7 @@ static int DiskDriver(char *arg)
             {
                 return 0;
             }
-            /*
-            processPtr currentProc = &ProcTable[getpid() % MAXPROC];
-            int msgSize = 10;
-            char message[msgSize];
-            void* messageBuf = (void*) &message;
-            USLOSS_Console("DiskDriver(): Doing a receive on mailbox %d.\n", currentProc->privateMboxID);
-            int receiveResult = MboxReceive(currentProc->privateMboxID, messageBuf, msgSize);
-            USLOSS_Console("DiskDriver(): Unblocked in the if loop.\n");
-            if(receiveResult == -1)
-            {
-              USLOSS_Console("DiskDriver(): Receive called with invalid args.\n");
-              USLOSS_Halt(1);
-            }
-            if(receiveResult > 0) // There was a message of size > 0
-            {
-                dumpProcesses();
-                USLOSS_Console("DiskDriver(): Raising semaphore.\n");
-                // Allow start3 to finish and quit
-                USLOSS_Console("DiskDriver(): Now quiting.\n");
-                quit(0);
-            }
-            */
+
             // Once we've awoken, a request should exist
             requestProc = dequeueDiskRequest();
             if (requestProc == NULL)
