@@ -13,6 +13,8 @@ extern int debugflag4;
 termInputBuffer TermReadBuffers[USLOSS_TERM_UNITS];
 semaphore TermReadBufferLocks[USLOSS_TERM_UNITS];
 int TermReadBufferWaitMbox[USLOSS_TERM_UNITS];
+int TermWriteWaitMbox[USLOSS_TERM_UNITS];
+int TermWriteMessageMbox[USLOSS_TERM_UNITS];
 
 void termRead(systemArgs *args)
 {
@@ -157,7 +159,24 @@ int termWriteReal(int unit, int size, char *text)
     {
         USLOSS_Console("termWriteReal(): called.\n");
     }
-    return -1;
+
+    // Check params
+    if (unit < 0 || unit >= USLOSS_TERM_UNITS)
+    {
+        return -1;
+    }
+    if (size < 0)
+    {
+        return -1;
+    }
+
+    // Send the text to the mailbox
+    MboxSend(TermWriteMessageMbox[unit], text, size);
+
+    // Once the text has been sent, wait for the writing to complete
+    MboxReceive(TermWriteWaitMbox[unit], NULL, 0);
+
+    return size;
 }
 
 /*

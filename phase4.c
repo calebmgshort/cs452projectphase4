@@ -39,6 +39,8 @@ extern int DiskSizes[];
 extern termInputBuffer TermReadBuffers[];
 extern semaphore TermReadBufferLocks[];
 extern int TermReadBufferWaitMbox[];
+extern int TermWriteWaitMbox[];
+extern int TermWriteMessageMbox[];
 
 int start3(char *args)
 {
@@ -323,6 +325,10 @@ static int TermDriver(char *arg)
         // Retrieve the status register
         int status;
         int result = waitDevice(USLOSS_TERM_DEV, unit, &status);
+        if (result != 0)
+        {
+            return 0;
+        }
 
         // Check if we can receive a character
         int recvStatus = USLOSS_TERM_STAT_RECV(status);
@@ -343,12 +349,35 @@ static int TermDriver(char *arg)
         int xmitStatus = USLOSS_TERM_STAT_XMIT(status);
         if (xmitStatus == USLOSS_DEV_READY)
         {
-            // Send a char
-            unsigned int control = 0;
-            // TODO set the character bits
-            // TODO set the send char flag
-            // TODO set the recv int enable flag
-            // TODO determine if we should set the xmit int enable flag
+            // Try to send a char
+            unsigned long control = 0;
+
+            // Get the char to send
+            char output;
+            result = receivePrivateMessageCond(&output, sizeof(char));
+
+            if (result != -2)
+            {
+                // Set the character bits
+                control = USLOSS_TERM_CTRL_CHAR(control, output);
+
+                // Set the send char flag
+                control = USLOSS_TERM_CTRL_XMIT_CHAR(control);
+
+                // Set the xmit flag
+                control = USLOSS_TERM_CTRL_XMIT_INT(control);
+            }
+
+            // Always set recv flag
+            control = USLOSS_TERM_CTRL_RECV_INT(control);
+
+            // Send the char
+            result = USLOSS_DeviceOutput(USLOSS_TERM_DEV, unit, (void *) control);
+            if (result != USLOSS_DEV_OK)
+            {
+                USLOSS_Console("TermDriver(): Failed to send output to terminal %d.\n", unit);
+                USLOSS_Halt(1);
+            }
         }
         else if (xmitStatus == USLOSS_DEV_ERROR)
         {
@@ -368,17 +397,17 @@ static int TermReader(char *args)
         USLOSS_Console("TermRead(): Called.\n");
     }
 
-    // Enable interrupts and tell parent we're running
-    enableInterrupts();
-    semvReal(running);
-
     // Get the associated unit number
     int unit = atoi(args);
-
+    
     // Initialize the buffers and semaphores
     clearBuffer(&TermReadBuffers[unit]);
     TermReadBufferLocks[unit] = semcreateReal(1);
     TermReadBufferWaitMbox[unit] = MboxCreate(0, MAX_MESSAGE);
+
+    // Enable interrupts and tell parent we're running
+    enableInterrupts();
+    semvReal(running);
 
     while (!isZapped())
     {
@@ -397,12 +426,25 @@ static int TermWriter(char *args)
         USLOSS_Console("TermWrite(): Called.\n");
     }
 
+    // Get the associated unit number
+    int unit = atoi(args);
+
+    // Initialize the mailboxes
+    TermWriteWaitMbox[unit] = MboxCreate(0, MAX_MESSAGE);
+    TermWriteMessageMbox[unit] = MboxCreate(0, MAX_MESSAGE);
+
     // Enable interrupts and tell parent we're running
     enableInterrupts();
     semvReal(running);
 
-    // Get the associated unit number
-    int unit = atoi(args);
+    while (!isZapped())
+    {
+        // A buffer for the written message
+        char buffer[MAXLINE];
+
+        // Receive a message from the mailbox
+        MboxReceive(TermWriteMessageMbox[unit], buffer, MAXLINE); 
+    }
     
     return 0;
 }
