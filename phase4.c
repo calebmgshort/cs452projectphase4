@@ -174,7 +174,7 @@ int start3(char *args)
         // Wait for the writer to start
         sempReal(running);
     }
-    */
+
     // Create first user-level process and wait for it to finish.
     if (DEBUG4 && debugflag4)
     {
