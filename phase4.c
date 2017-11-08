@@ -255,6 +255,10 @@ static int DiskDriver(char *arg)
             }
             // Block and wait for a request to come in
             blockOnMbox();
+            if(DEBUG4 && debugflag4)
+            {
+                USLOSS_Console("DiskDriver(): Just unblocked.\n");
+            }
             if(isZapped())
             {
                 return 0;
