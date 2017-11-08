@@ -1,14 +1,12 @@
 #include <usloss.h>
 #include <usyscall.h>
-#include <phase1.h>
-#include <phase2.h>
-#include <phase3.h>
-#include <phase4.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 #include "phase1.h"
 #include "phase2.h"
+#include "phase3.h"
+#include "phase4.h"
 #include "devices.h"
 #include "providedPrototypes.h"
 #include "phase4utility.h"
@@ -26,12 +24,23 @@ semaphore running;
 static int ClockDriver(char *);
 static int DiskDriver(char *);
 static int TermDriver(char *);
+static int TermReader(char *);
+static int TermWriter(char *);
 
 // Phase 4 proc table
 process ProcTable[MAXPROC];
 int diskPIDs[USLOSS_DISK_UNITS];
+int termPIDs[USLOSS_TERM_UNITS];
+int termReaderPIDs[USLOSS_TERM_UNITS];
+int termWriterPIDs[USLOSS_TERM_UNITS];
 
+// Driver data structures
 extern int DiskSizes[];
+extern termInputBuffer TermReadBuffers[];
+extern semaphore TermReadBufferLocks[];
+extern int TermReadBufferWaitMbox[];
+extern int TermWriteWaitMbox[];
+extern int TermWriteMessageMbox[];
 
 int start3(char *args)
 {
@@ -42,7 +51,6 @@ int start3(char *args)
 
     char name[128];
     int clockPID;
-    int termPIDs[USLOSS_TERM_UNITS];
     int	status;
     char buf[10];
 
@@ -98,6 +106,7 @@ int start3(char *args)
             USLOSS_Console("start3(): Creating disk device driver %d.\n", i);
         }
         sprintf(buf, "%d", i);
+        sprintf(name, "DiskDriver %d", i);
         int pid = fork1(name, DiskDriver, buf, USLOSS_MIN_STACK, 2);
         diskPIDs[i] = pid;
         if (pid < 0)
@@ -110,25 +119,59 @@ int start3(char *args)
         sempReal(running);
     }
 
-    // May be other stuff to do here before going on to terminal drivers
-    /*
-    // Create terminal device drivers
+    // Create terminal device processes
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
+        // Create the driver
         if (DEBUG4 && debugflag4)
         {
             USLOSS_Console("start3(): Creating terminal device driver %d.\n", i);
         }
         sprintf(buf, "%d", i);
+        sprintf(name, "TermDriver %d", i);
         int pid = fork1(name, TermDriver, buf, USLOSS_MIN_STACK, 2);
         termPIDs[i] = pid;
         if (pid < 0)
         {
-            USLOSS_Console("start3(): Can't create term driver %d\n", i);
+            USLOSS_Console("start3(): Can't create term driver %d.\n", i);
             USLOSS_Halt(1);
         }
 
         // Wait for the driver to start
+        sempReal(running);
+
+        // Create the reader
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("start3(): Creating terminal reader %d.\n", i);
+        }
+        sprintf(name, "TermReader %d", i);
+        pid = fork1(name, TermReader, buf, USLOSS_MIN_STACK, 2);
+        termReaderPIDs[i] = pid;
+        if (pid < 0)
+        {
+            USLOSS_Console("start3(): Can't create term reader %d.\n", i);
+            USLOSS_Halt(1);
+        }
+
+        // Wait for the reader to start
+        sempReal(running);
+
+        // Create the writer
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("start3(); Creating terminal writer %d.\n", i);
+        }
+        sprintf(name, "TermWriter %d", i);
+        pid = fork1(name, TermWriter, buf, USLOSS_MIN_STACK, 2);
+        termWriterPIDs[i] = pid;
+        if (pid < 0)
+        {
+            USLOSS_Console("start3(): Can't create term writer %d.\n", i);
+            USLOSS_Halt(1);
+        }
+        
+        // Wait for the writer to start
         sempReal(running);
     }
     */
@@ -156,16 +199,12 @@ int start3(char *args)
         unblockProc(diskPIDs[i]);
         zap(diskPIDs[i]);
     }
-    /*
-    USLOSS_Console("start3(): Now zapping terms.\n");
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
-        if (0)
-            USLOSS_Console("%d", termPIDs[i]);
         zap(termPIDs[i]);
+        zap(termReaderPIDs[i]);
+        zap(termWriterPIDs[i]);
     }
-    */
-    //USLOSS_Console("start3(): Finished zapping.\n");
 
     // Quit
     quit(0);
@@ -208,7 +247,7 @@ static int ClockDriver(char *arg)
  */
 static int DiskDriver(char *arg)
 {
-    if(DEBUG4 && debugflag4)
+    if (DEBUG4 && debugflag4)
     {
         USLOSS_Console("DiskDriver(): called.\n");
     }
@@ -287,7 +326,7 @@ static int DiskDriver(char *arg)
  */
 static int TermDriver(char *arg)
 {
-    if(DEBUG4 && debugflag4)
+    if (DEBUG4 && debugflag4)
     {
         USLOSS_Console("TermDriver(): called.\n");
     }
@@ -301,14 +340,21 @@ static int TermDriver(char *arg)
 
     while (!isZapped())
     {
+        // Retrieve the status register
         int status;
         int result = waitDevice(USLOSS_TERM_DEV, unit, &status);
+        if (result != 0)
+        {
+            return 0;
+        }
 
-        int recvStatus; // TODO unpack from status
+        // Check if we can receive a character
+        int recvStatus = USLOSS_TERM_STAT_RECV(status);
         if (recvStatus == USLOSS_DEV_BUSY)
         {
-            char character; // TODO unpack from status
-            // TODO receive the char
+            // Send the character to the reader
+            char character = USLOSS_TERM_STAT_CHAR(status);
+            sendPrivateMessage(termReaderPIDs[unit], &character, sizeof(char));
         }
         else if (recvStatus == USLOSS_DEV_ERROR)
         {
@@ -317,15 +363,39 @@ static int TermDriver(char *arg)
             USLOSS_Halt(1);
         }
 
-        int xmitStatus; // TODO unpack from status
+        // Check if we can transmit a character
+        int xmitStatus = USLOSS_TERM_STAT_XMIT(status);
         if (xmitStatus == USLOSS_DEV_READY)
         {
-            // Send a char
-            unsigned int control = 0;
-            // TODO set the character bits
-            // TODO set the send char flag
-            // TODO set the recv int enable flag
-            // TODO determine if we should set the xmit int enable flag
+            // Try to send a char
+            unsigned long control = 0;
+
+            // Get the char to send
+            char output;
+            result = receivePrivateMessageCond(&output, sizeof(char));
+
+            if (result != -2)
+            {
+                // Set the character bits
+                control = USLOSS_TERM_CTRL_CHAR(control, output);
+
+                // Set the send char flag
+                control = USLOSS_TERM_CTRL_XMIT_CHAR(control);
+
+                // Set the xmit flag
+                control = USLOSS_TERM_CTRL_XMIT_INT(control);
+            }
+
+            // Always set recv flag
+            control = USLOSS_TERM_CTRL_RECV_INT(control);
+
+            // Send the char
+            result = USLOSS_DeviceOutput(USLOSS_TERM_DEV, unit, (void *) control);
+            if (result != USLOSS_DEV_OK)
+            {
+                USLOSS_Console("TermDriver(): Failed to send output to terminal %d.\n", unit);
+                USLOSS_Halt(1);
+            }
         }
         else if (xmitStatus == USLOSS_DEV_ERROR)
         {
@@ -335,5 +405,64 @@ static int TermDriver(char *arg)
         }
     }
 
+    return 0;
+}
+
+static int TermReader(char *args)
+{
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("TermRead(): Called.\n");
+    }
+
+    // Get the associated unit number
+    int unit = atoi(args);
+    
+    // Initialize the buffers and semaphores
+    clearBuffer(&TermReadBuffers[unit]);
+    TermReadBufferLocks[unit] = semcreateReal(1);
+    TermReadBufferWaitMbox[unit] = MboxCreate(0, MAX_MESSAGE);
+
+    // Enable interrupts and tell parent we're running
+    enableInterrupts();
+    semvReal(running);
+
+    while (!isZapped())
+    {
+        // Try to receive a char
+        char input;
+        receivePrivateMessage(&input, sizeof(char));
+        storeChar(unit, input);
+    }
+    return 0;
+}
+
+static int TermWriter(char *args)
+{
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("TermWrite(): Called.\n");
+    }
+
+    // Get the associated unit number
+    int unit = atoi(args);
+
+    // Initialize the mailboxes
+    TermWriteWaitMbox[unit] = MboxCreate(0, MAX_MESSAGE);
+    TermWriteMessageMbox[unit] = MboxCreate(0, MAX_MESSAGE);
+
+    // Enable interrupts and tell parent we're running
+    enableInterrupts();
+    semvReal(running);
+
+    while (!isZapped())
+    {
+        // A buffer for the written message
+        char buffer[MAXLINE];
+
+        // Receive a message from the mailbox
+        MboxReceive(TermWriteMessageMbox[unit], buffer, MAXLINE); 
+    }
+    
     return 0;
 }

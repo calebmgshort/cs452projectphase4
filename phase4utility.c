@@ -74,6 +74,33 @@ void unblockByMbox(processPtr proc)
     MboxCondSend(proc->privateMboxID, NULL, 0);
 }
 
+/*
+ * Receive a message from the current proc's private mailbox.
+ */
+void receivePrivateMessage(void *msg, int size)
+{
+    processPtr proc = &ProcTable[getpid() % MAXPROC];
+    MboxReceive(proc->privateMboxID, msg, size);
+}
+
+/*
+ * Conditionally receive a message from the current proc's private mailbox.
+ */
+int receivePrivateMessageCond(void *msg, int size)
+{
+    processPtr proc = &ProcTable[getpid() % MAXPROC];
+    return MboxCondReceive(proc->privateMboxID, msg, size);
+}
+
+/*
+ * Sends a message to the mailbox corresponding to the given pid.
+ */
+void sendPrivateMessage(int pid, void *msg, int size)
+{
+    processPtr proc = &ProcTable[pid % MAXPROC];
+    MboxSend(proc->privateMboxID, msg, size);
+}
+
 void clearProcRequest(processPtr proc)
 {
     proc->diskRequest.op = EMPTY;

@@ -1,10 +1,20 @@
 #include <usloss.h>
 #include <usyscall.h>
+#include <stdlib.h>
+
+#include "phase2.h"
+#include "providedPrototypes.h"
 #include "devices.h"
 #include "phase4utility.h"
 #include "phase4term.h"
 
 extern int debugflag4;
+
+termInputBuffer TermReadBuffers[USLOSS_TERM_UNITS];
+semaphore TermReadBufferLocks[USLOSS_TERM_UNITS];
+int TermReadBufferWaitMbox[USLOSS_TERM_UNITS];
+int TermWriteWaitMbox[USLOSS_TERM_UNITS];
+int TermWriteMessageMbox[USLOSS_TERM_UNITS];
 
 void termRead(systemArgs *args)
 {
@@ -44,13 +54,65 @@ void termRead(systemArgs *args)
     setToUserMode();
 }
 
-int termReadReal(int unit, int size, char *buffer)
+int termReadReal(int unit, int size, char *resultBuffer)
 {
     if (DEBUG4 && debugflag4)
     {
         USLOSS_Console("termReadReal(): called.\n");
     }
-    return -1;
+
+    // Check args
+    if (unit < 0 || unit >= USLOSS_TERM_UNITS)
+    {
+        return -1;
+    }
+    if (size < 0)
+    {
+        return -1;
+    }
+
+    // Acquire the mutex lock on the buffer
+    sempReal(TermReadBufferLocks[unit]);
+
+    // Get the buffer
+    termInputBuffer *buffer = &TermReadBuffers[unit];
+
+    // Wait if the buffer is empty
+    if (buffer->lineToRead == EMPTY)
+    {
+        semvReal(TermReadBufferLocks[unit]);
+        MboxReceive(TermReadBufferWaitMbox[unit], NULL, 0);
+        sempReal(TermReadBufferLocks[unit]);
+    }
+
+    // Copy the data from the buffer
+    termLine line = buffer->lines[buffer->lineToRead];
+    int i;
+    for (i = 0; i < size - 1; i++)
+    {
+        if (i == line.indexToModify)
+        {
+            break;
+        }
+        resultBuffer[size - 1] = line.characters[i];
+    }
+    resultBuffer[i] = '\0';
+
+    // Indicate that the line has been read
+    buffer->lineToRead++;
+    if (buffer->lineToRead == 10)
+    {
+        buffer->lineToRead = 0;
+    }
+    if (buffer->lineToRead == buffer->lineToModify)
+    {
+        buffer->lineToRead = EMPTY;
+    }
+
+    // Release the lock
+    semvReal(TermReadBufferLocks[unit]);
+
+    return 0;
 }
 
 void termWrite(systemArgs *args)
@@ -97,5 +159,81 @@ int termWriteReal(int unit, int size, char *text)
     {
         USLOSS_Console("termWriteReal(): called.\n");
     }
-    return -1;
+
+    // Check params
+    if (unit < 0 || unit >= USLOSS_TERM_UNITS)
+    {
+        return -1;
+    }
+    if (size < 0)
+    {
+        return -1;
+    }
+
+    // Send the text to the mailbox
+    MboxSend(TermWriteMessageMbox[unit], text, size);
+
+    // Once the text has been sent, wait for the writing to complete
+    MboxReceive(TermWriteWaitMbox[unit], NULL, 0);
+
+    return size;
+}
+
+/*
+ * Initializes the supplied termInputBuffer.
+ */
+void clearBuffer(termInputBuffer *buffer)
+{
+    buffer->lineToRead = EMPTY;
+    buffer->lineToModify = 0;
+    for (int i = 0; i < 10; i++)
+    {
+        termLine *line = &buffer->lines[i];
+        line->indexToModify = 0;
+        for (int j = 0; j < MAXLINE; j++)
+        {
+            line->characters[j] = '\0';
+        }
+    }
+}
+
+/*
+ * Writes the given input char into the buffer associated with the given term
+ * unit. unit must be a valid term unit [0, USLOSS_TERM_UNITS - 1]
+ */
+void storeChar(int unit, char input)
+{
+    // Get the buffer
+    termInputBuffer *buffer = &TermReadBuffers[unit];
+
+    // Acquire the mutex lock
+    sempReal(TermReadBufferLocks[unit]);
+
+    // Modify the approrpriate line
+    termLine *line = &buffer->lines[buffer->lineToModify];
+    line->characters[line->indexToModify] = input;
+    line->indexToModify++;
+    
+    // If we've reached the end of the line, move to the next
+    if (line->indexToModify == MAXLINE || input == '\n')
+    {
+        // If the buffer was previously empty, tell it where it can be read
+        if (buffer->lineToRead == EMPTY)
+        {
+            buffer->lineToRead = buffer->lineToModify;
+        }
+        buffer->lineToModify++;
+
+        // If something was waiting on the mailbox, unblock it
+        MboxCondSend(TermReadBufferWaitMbox[unit], NULL, 0);
+    }
+
+    // Wrap around if necessary
+    if (buffer->lineToModify == 10)
+    {
+        buffer->lineToModify = 0;
+    }
+
+    // Release the mutex lock
+    semvReal(TermReadBufferLocks[unit]);
 }

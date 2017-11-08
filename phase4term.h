@@ -9,4 +9,6 @@ extern void termWrite(systemArgs *);
 extern int termReadReal(int, int, char *);
 extern int termWriteReal(int, int, char *);
 
+extern void clearBuffer(termInputBuffer *);
+extern void storeChar(int, char);
 #endif
