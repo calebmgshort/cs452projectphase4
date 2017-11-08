@@ -39,13 +39,13 @@ void diskRead(systemArgs *args)
 
     // Unpack the args
     void* memoryAddress = args->arg1;
-    int numSectorsToRead = (int) ((long) args->arg2);
+    int numSectors = (int) ((long) args->arg2);
     int startDiskTrack = (int) ((long) args->arg3);
     int startDiskSector = (int) ((long) args->arg4);
-    int unitNumToRead = (int) ((long) args->arg5);
+    int unitNum = (int) ((long) args->arg5);
 
     // check for illegal input values
-    if(numSectorsToRead < 0 || numSectorsToRead >= USLOSS_DISK_TRACK_SIZE)
+    if(numSectors < 0 || numSectors >= USLOSS_DISK_TRACK_SIZE)
     {
         if(DEBUG4 && debugflag4)
         {
@@ -54,7 +54,7 @@ void diskRead(systemArgs *args)
         args->arg4 = (void*) -1;
         return;
     }
-    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
+    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNum])
     {
         if(DEBUG4 && debugflag4)
         {
@@ -72,7 +72,7 @@ void diskRead(systemArgs *args)
         args->arg4 = (void*) -1;
         return;
     }
-    else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
+    else if(unitNum < 0 || unitNum >= USLOSS_DISK_UNITS)
     {
         if(DEBUG4 && debugflag4)
         {
@@ -81,8 +81,8 @@ void diskRead(systemArgs *args)
         args->arg4 = (void*) -1;
         return;
     }
-    int endingDiskTrack = startDiskSector + (startDiskSector + numSectorsToRead)/USLOSS_DISK_TRACK_SIZE;
-    if(endingDiskTrack >= DiskSizes[unitNumToRead])
+    int endingDiskTrack = startDiskSector + numSectors/USLOSS_DISK_TRACK_SIZE;
+    if(endingDiskTrack >= DiskSizes[unitNum])
     {
         if(DEBUG4 && debugflag4)
         {
@@ -92,8 +92,8 @@ void diskRead(systemArgs *args)
         return;
     }
 
-    int result = diskReadReal(memoryAddress, numSectorsToRead, startDiskTrack,
-                              startDiskSector, unitNumToRead);
+    int result = diskReadReal(memoryAddress, numSectors, startDiskTrack,
+                              startDiskSector, unitNum);
 
     args->arg1 = (void*) ((long) result);
     args->arg4 = (void *) 0;
@@ -123,13 +123,13 @@ void diskWrite(systemArgs *args)
         USLOSS_Console("diskWrite(): called.\n");
     }
     void* memoryAddress = args->arg1;
-    int numSectorsToRead = (int) ((long) args->arg2);
+    int numSectors = (int) ((long) args->arg2);
     int startDiskTrack = (int) ((long) args->arg3);
     int startDiskSector = (int) ((long) args->arg4);
-    int unitNumToRead = (int) ((long) args->arg5);
+    int unitNum = (int) ((long) args->arg5);
 
     // check for illegal input values
-    if(numSectorsToRead < 0 || numSectorsToRead >= USLOSS_DISK_TRACK_SIZE)
+    if(numSectors < 0 || numSectors >= USLOSS_DISK_TRACK_SIZE)
     {
         if(DEBUG4 && debugflag4)
         {
@@ -138,7 +138,7 @@ void diskWrite(systemArgs *args)
         args->arg4 = (void*) -1;
         return;
     }
-    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
+    else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNum])
     {
         if(DEBUG4 && debugflag4)
         {
@@ -156,7 +156,7 @@ void diskWrite(systemArgs *args)
         args->arg4 = (void*) -1;
         return;
     }
-    else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
+    else if(unitNum < 0 || unitNum >= USLOSS_DISK_UNITS)
     {
         if(DEBUG4 && debugflag4)
         {
@@ -165,8 +165,8 @@ void diskWrite(systemArgs *args)
         args->arg4 = (void*) -1;
         return;
     }
-    int endingDiskTrack = startDiskSector + (startDiskSector + numSectorsToRead)/USLOSS_DISK_TRACK_SIZE;
-    if(endingDiskTrack >= DiskSizes[unitNumToRead])
+    int endingDiskTrack = startDiskSector + numSectors/USLOSS_DISK_TRACK_SIZE;
+    if(endingDiskTrack >= DiskSizes[unitNum])
     {
         if(DEBUG4 && debugflag4)
         {
@@ -176,8 +176,8 @@ void diskWrite(systemArgs *args)
         return;
     }
 
-    int result = diskWriteReal(memoryAddress, numSectorsToRead, startDiskTrack,
-                              startDiskSector, unitNumToRead);
+    int result = diskWriteReal(memoryAddress, numSectors, startDiskTrack,
+                              startDiskSector, unitNum);
 
     args->arg1 = (void*) ((long) result);
     args->arg4 = (void *) 0;
