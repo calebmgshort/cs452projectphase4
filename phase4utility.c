@@ -101,6 +101,15 @@ void sendPrivateMessage(int pid, void *msg, int size)
     MboxSend(proc->privateMboxID, msg, size);
 }
 
+/*
+ * Conditionally send a message to the private mailbox of the given pid.
+ */
+int sendPrivateMessageCond(int pid, void *msg, int size)
+{
+    processPtr proc = &ProcTable[pid % MAXPROC];
+    return MboxCondSend(proc->privateMboxID, msg, size);
+}
+
 void clearProcRequest(processPtr proc)
 {
     proc->diskRequest.op = EMPTY;

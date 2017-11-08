@@ -13,4 +13,5 @@ extern int compareRequests(diskRequest *, diskRequest *);
 extern void sendPrivateMessage(int, void *, int);
 extern void receivePrivateMessage(void *, int);
 extern int receivePrivateMessageCond(void *, int);
+extern int sendPrivateMessageCond(int, void *, int);
 #endif

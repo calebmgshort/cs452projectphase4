@@ -15,7 +15,7 @@
 #include "phase4term.h"
 
 // Debugging flag
-int debugflag4 = 0;
+int debugflag4 = 1;
 
 // Semaphore used to create drivers
 semaphore running;
@@ -44,7 +44,7 @@ extern int TermWriteMessageMbox[];
 
 int start3(char *args)
 {
-    if(DEBUG4 && debugflag4)
+    if (DEBUG4 && debugflag4)
     {
         USLOSS_Console("start3(): started.\n");
     }
@@ -201,8 +201,36 @@ int start3(char *args)
     }
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("start3(): Zapping term driver %d.\n", i);
+        }
+
         zap(termPIDs[i]);
+
+
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("start3(): Zapping term reader %d.\n", i);
+        }
+
+        // Unblock the reader, if it's waiting for a character
+        char null = '\0';
+        sendPrivateMessageCond(termReaderPIDs[i], &null, sizeof(char));
+        
+        // zap it
         zap(termReaderPIDs[i]);
+        
+
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("start3(): Zapping term writer %d.\n", i);
+        }
+        
+        // Unblock the writer, if it's waiting for input
+        MboxCondSend(TermWriteMessageMbox[i], NULL, 0);
+        
+        // zap it
         zap(termWriterPIDs[i]);
     }
 
@@ -440,9 +468,11 @@ static int TermReader(char *args)
 
     while (!isZapped())
     {
-        // Try to receive a char
+        // Try to receive a char from the driver
         char input;
         receivePrivateMessage(&input, sizeof(char));
+
+        // Store the char in a semaphore protected buffer
         storeChar(unit, input);
     }
     return 0;
@@ -483,10 +513,16 @@ static int TermWriter(char *args)
         {
             // Send chars to the driver
             sendPrivateMessage(diskPIDs[unit], buffer + i, sizeof(char));
+
+            // Stop prematurely if we're zapped
+            if (isZapped())
+            {
+                return 0;
+            }
         }
 
         // Unblock a proc once we've completed the line
-        int result = MboxCondSend(TermWriteMbox[unit], NULL, 0);
+        int result = MboxCondSend(TermWriteWaitMbox[unit], NULL, 0);
         if (result == -2)
         {
             USLOSS_Console("TermWriter(): Process that wrote to terminal was not blocked.\n");

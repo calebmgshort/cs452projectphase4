@@ -44,7 +44,7 @@ $(TESTS):	$(TARGET) p1.o
 
 clean:
 	rm -f $(COBJS) $(TARGET) test*.o test*.txt term* $(TESTS) \
-		libuser.o p1.o core
+		libuser.o p1.o core disk0 disk1
 
 phase4.o:	devices.h
 
