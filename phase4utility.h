@@ -10,5 +10,6 @@ extern void unblockByMbox(processPtr);
 extern void clearProcRequest(processPtr);
 extern void clearProc(processPtr);
 extern int compareRequests(diskRequest *, diskRequest *);
-
+extern void sendPrivateMessage(int, void *, int);
+extern void receivePrivateMessage(void *, int);
 #endif

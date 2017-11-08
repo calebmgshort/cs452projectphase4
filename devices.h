@@ -1,12 +1,17 @@
 #ifndef _DEVICES_H
 #define _DEVICES_H
 
+#include "phase4.h"
+
 #define DEBUG4 1
 
 typedef struct process process;
 typedef struct process * processPtr;
 
 typedef struct diskRequest diskRequest;
+
+typedef struct termLine termLine;
+typedef struct termInputBuffer termInputBuffer;
 
 typedef int semaphore;
 typedef USLOSS_Sysargs systemArgs;
@@ -35,6 +40,19 @@ struct process
     // Disk fields
     processPtr nextDiskQueueProc;     // The next proc in the disk queue
     diskRequest diskRequest;          // Holds information on the request to the disk
+};
+
+struct termLine
+{
+    char characters[MAXLINE];         // The characters in the line
+    int indexToModify;                // The index of the first empty spot in the array.
+};
+
+struct termInputBuffer
+{
+    termLine lines[10];               // The 10 line buffer
+    int lineToModify;                 // The line that new chars should be written to
+    int lineToRead;                   // The line to read when reading from this buffer
 };
 
 #define EMPTY -1
