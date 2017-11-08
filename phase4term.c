@@ -165,7 +165,7 @@ int termWriteReal(int unit, int size, char *text)
     {
         return -1;
     }
-    if (size < 0)
+    if (size < 0 || size > MAXLINE)
     {
         return -1;
     }

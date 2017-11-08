@@ -338,11 +338,22 @@ static int TermDriver(char *arg)
     // Get the unit number associated with this driver
     int unit = atoi(arg);
 
+    // Do an initial device output to get the terminals started
+    unsigned long control = 0;
+    control = USLOSS_TERM_CTRL_RECV_INT(control);
+    control = USLOSS_TERM_CTRL_XMIT_INT(control);
+    int result = USLOSS_DeviceOutput(USLOSS_TERM_DEV, unit, (void *) control);
+    if (result != USLOSS_DEV_OK)
+    {
+        USLOSS_Console("TermDriver(): Failed to set control register.\n");
+        USLOSS_Halt(1);
+    }
+
     while (!isZapped())
     {
         // Retrieve the status register
         int status;
-        int result = waitDevice(USLOSS_TERM_DEV, unit, &status);
+        result = waitDevice(USLOSS_TERM_DEV, unit, &status);
         if (result != 0)
         {
             return 0;
@@ -461,7 +472,26 @@ static int TermWriter(char *args)
         char buffer[MAXLINE];
 
         // Receive a message from the mailbox
-        MboxReceive(TermWriteMessageMbox[unit], buffer, MAXLINE); 
+        int size = MboxReceive(TermWriteMessageMbox[unit], buffer, MAXLINE); 
+        if (size == -3)
+        {
+            // We were zapped while waiting for a message
+            return 0;
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            // Send chars to the driver
+            sendPrivateMessage(diskPIDs[unit], buffer + i, sizeof(char));
+        }
+
+        // Unblock a proc once we've completed the line
+        int result = MboxCondSend(TermWriteMbox[unit], NULL, 0);
+        if (result == -2)
+        {
+            USLOSS_Console("TermWriter(): Process that wrote to terminal was not blocked.\n");
+            USLOSS_Halt(1);
+        }
     }
     
     return 0;
