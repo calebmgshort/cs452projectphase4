@@ -10,9 +10,9 @@
 
 extern int debugflag4;
 
-termInputBuffer buffers[USLOSS_TERM_UNITS];
-semaphore bufferLocks[USLOSS_TERM_UNITS];
-int bufferWaitMbox[USLOSS_TERM_UNITS];
+termInputBuffer TermReadBuffers[USLOSS_TERM_UNITS];
+semaphore TermReadBufferLocks[USLOSS_TERM_UNITS];
+int TermReadBufferWaitMbox[USLOSS_TERM_UNITS];
 
 void termRead(systemArgs *args)
 {
@@ -70,17 +70,17 @@ int termReadReal(int unit, int size, char *resultBuffer)
     }
 
     // Acquire the mutex lock on the buffer
-    sempReal(bufferLocks[unit]);
+    sempReal(TermReadBufferLocks[unit]);
 
     // Get the buffer
-    termInputBuffer *buffer = &buffers[unit];
+    termInputBuffer *buffer = &TermReadBuffers[unit];
 
     // Wait if the buffer is empty
     if (buffer->lineToRead == EMPTY)
     {
-        semvReal(bufferLocks[unit]);
-        MboxReceive(bufferWaitMbox[unit], NULL, 0);
-        sempReal(bufferLocks[unit]);
+        semvReal(TermReadBufferLocks[unit]);
+        MboxReceive(TermReadBufferWaitMbox[unit], NULL, 0);
+        sempReal(TermReadBufferLocks[unit]);
     }
 
     // Copy the data from the buffer
@@ -108,7 +108,7 @@ int termReadReal(int unit, int size, char *resultBuffer)
     }
 
     // Release the lock
-    semvReal(bufferLocks[unit]);
+    semvReal(TermReadBufferLocks[unit]);
 
     return 0;
 }
@@ -185,10 +185,10 @@ void clearBuffer(termInputBuffer *buffer)
 void storeChar(int unit, char input)
 {
     // Get the buffer
-    termInputBuffer *buffer = &buffers[unit];
+    termInputBuffer *buffer = &TermReadBuffers[unit];
 
     // Acquire the mutex lock
-    sempReal(bufferLocks[unit]);
+    sempReal(TermReadBufferLocks[unit]);
 
     // Modify the approrpriate line
     termLine *line = &buffer->lines[buffer->lineToModify];
@@ -206,7 +206,7 @@ void storeChar(int unit, char input)
         buffer->lineToModify++;
 
         // If something was waiting on the mailbox, unblock it
-        MboxCondSend(bufferWaitMbox[unit], NULL, 0);
+        MboxCondSend(TermReadBufferWaitMbox[unit], NULL, 0);
     }
 
     // Wrap around if necessary
@@ -216,5 +216,5 @@ void storeChar(int unit, char input)
     }
 
     // Release the mutex lock
-    semvReal(bufferLocks[unit]);
+    semvReal(TermReadBufferLocks[unit]);
 }

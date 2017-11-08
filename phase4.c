@@ -36,9 +36,9 @@ int termWriterPIDs[USLOSS_TERM_UNITS];
 
 // Driver data structures
 extern int DiskSizes[];
-extern termInputBuffer buffers[];
-extern semaphore bufferLocks[];
-extern int bufferWaitMbox[];
+extern termInputBuffer TermReadBuffers[];
+extern semaphore TermReadBufferLocks[];
+extern int TermReadBufferWaitMbox[];
 
 int start3(char *args)
 {
@@ -376,9 +376,9 @@ static int TermReader(char *args)
     int unit = atoi(args);
 
     // Initialize the buffers and semaphores
-    clearBuffer(&buffers[unit]);
-    bufferLocks[unit] = semcreateReal(1);
-    bufferWaitMbox[unit] = MboxCreate(0, MAX_MESSAGE);
+    clearBuffer(&TermReadBuffers[unit]);
+    TermReadBufferLocks[unit] = semcreateReal(1);
+    TermReadBufferWaitMbox[unit] = MboxCreate(0, MAX_MESSAGE);
 
     while (!isZapped())
     {
