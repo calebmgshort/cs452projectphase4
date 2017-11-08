@@ -102,7 +102,7 @@ int start3(char *args)
         diskPIDs[i] = pid;
         if (pid < 0)
         {
-            USLOSS_Console("start3(): Can't create term driver %d\n", i);
+            USLOSS_Console("start3(): Can't create disk driver %d\n", i);
             USLOSS_Halt(1);
         }
 
@@ -213,10 +213,6 @@ static int DiskDriver(char *arg)
         USLOSS_Console("DiskDriver(): called.\n");
     }
 
-    // Enable interrupts and tell parent that we're running
-    semvReal(running);
-    enableInterrupts();
-
     // Find the unit number
     int unit = atoi(arg);
 
@@ -230,6 +226,22 @@ static int DiskDriver(char *arg)
         USLOSS_Console("diskSizeReal(): Could not get number of tracks.\n");
         USLOSS_Halt(1);
     }
+    // Wait for the request to finish
+    int status;
+    result = waitDevice(USLOSS_DISK_DEV, unit, &status);
+    if (result != 0)
+    {
+        USLOSS_Console("diskSizeReal(): error: result of waitDevice was not 0: %d.\n", result);
+    }
+    if (status == USLOSS_DEV_ERROR)
+    {
+        USLOSS_Console("diskSizeReal(): error: the status of waitDevice is USLOSS_DEV_ERROR");
+    }
+
+
+    // Enable interrupts and tell parent that we're running
+    semvReal(running);
+    enableInterrupts();
 
     while (!isZapped())
     {
