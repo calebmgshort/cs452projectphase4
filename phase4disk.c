@@ -45,23 +45,49 @@ void diskRead(systemArgs *args)
     int unitNumToRead = (int) ((long) args->arg5);
 
     // check for illegal input values
-    if(numSectorsToRead < 0 || numSectorsToRead >= DiskSizes[unitNumToRead])
+    if(numSectorsToRead < 0 || numSectorsToRead >= USLOSS_DISK_TRACK_SIZE)
     {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskRead(): invalid args.\n");
+        }
         args->arg4 = (void*) -1;
         return;
     }
     else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
     {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskRead(): invalid args.\n");
+        }
         args->arg4 = (void*) -1;
         return;
     }
     else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE)
     {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskRead(): invalid args.\n");
+        }
         args->arg4 = (void*) -1;
         return;
     }
     else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
     {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskRead(): invalid args.\n");
+        }
+        args->arg4 = (void*) -1;
+        return;
+    }
+    int endingDiskTrack = startDiskSector + (startDiskSector + numSectorsToRead)/USLOSS_DISK_TRACK_SIZE;
+    if(endingDiskTrack >= DiskSizes[unitNumToRead])
+    {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskRead(): would have read past the end of the disk.\n");
+        }
         args->arg4 = (void*) -1;
         return;
     }
@@ -103,23 +129,49 @@ void diskWrite(systemArgs *args)
     int unitNumToRead = (int) ((long) args->arg5);
 
     // check for illegal input values
-    if(numSectorsToRead < 0 || numSectorsToRead >= DiskSizes[unitNumToRead])
+    if(numSectorsToRead < 0 || numSectorsToRead >= USLOSS_DISK_TRACK_SIZE)
     {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskWrite(): invalid args.\n");
+        }
         args->arg4 = (void*) -1;
         return;
     }
     else if(startDiskTrack < 0 || startDiskTrack >= DiskSizes[unitNumToRead])
     {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskWrite(): invalid args.\n");
+        }
         args->arg4 = (void*) -1;
         return;
     }
     else if(startDiskSector < 0 || startDiskSector >= USLOSS_DISK_TRACK_SIZE)
     {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskWrite(): invalid args.\n");
+        }
         args->arg4 = (void*) -1;
         return;
     }
     else if(unitNumToRead < 0 || unitNumToRead >= USLOSS_DISK_UNITS)
     {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskWrite(): invalid args.\n");
+        }
+        args->arg4 = (void*) -1;
+        return;
+    }
+    int endingDiskTrack = startDiskSector + (startDiskSector + numSectorsToRead)/USLOSS_DISK_TRACK_SIZE;
+    if(endingDiskTrack >= DiskSizes[unitNumToRead])
+    {
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskWrite(): would have written past the end of the disk.\n");
+        }
         args->arg4 = (void*) -1;
         return;
     }
@@ -229,7 +281,7 @@ void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int 
         proc->nextDiskQueueProc = next;
     }
 
-    processPtr diskDriver = &ProcTable[diskPIDs[unit] * MAXPROC];
+    processPtr diskDriver = &ProcTable[diskPIDs[unit] % MAXPROC];
     unblockByMbox(diskDriver);
 }
 

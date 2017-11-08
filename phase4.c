@@ -15,7 +15,7 @@
 #include "phase4term.h"
 
 // Debugging flag
-int debugflag4 = 1;
+int debugflag4 = 0;
 
 // Semaphore used to create drivers
 semaphore running;
@@ -81,8 +81,9 @@ int start3(char *args)
         proc->privateMboxID = MboxCreate(0, MAX_MESSAGE);
     }
 
-    // Create clock device driver
     running = semcreateReal(0);
+
+    // Create clock device driver
     if (DEBUG4 && debugflag4)
     {
         USLOSS_Console("start3(): Creating clock device driver.\n");
@@ -110,7 +111,7 @@ int start3(char *args)
         diskPIDs[i] = pid;
         if (pid < 0)
         {
-            USLOSS_Console("start3(): Can't create term driver %d\n", i);
+            USLOSS_Console("start3(): Can't create disk driver %d\n", i);
             USLOSS_Halt(1);
         }
 
@@ -173,7 +174,7 @@ int start3(char *args)
         // Wait for the writer to start
         sempReal(running);
     }
-
+    */
     // Create first user-level process and wait for it to finish.
     if (DEBUG4 && debugflag4)
     {
@@ -195,6 +196,7 @@ int start3(char *args)
     zap(clockPID);
     for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
+        unblockProc(diskPIDs[i]);
         zap(diskPIDs[i]);
     }
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
@@ -250,10 +252,6 @@ static int DiskDriver(char *arg)
         USLOSS_Console("DiskDriver(): called.\n");
     }
 
-    // Enable interrupts and tell parent that we're running
-    semvReal(running);
-    enableInterrupts();
-
     // Find the unit number
     int unit = atoi(arg);
 
@@ -267,6 +265,22 @@ static int DiskDriver(char *arg)
         USLOSS_Console("diskSizeReal(): Could not get number of tracks.\n");
         USLOSS_Halt(1);
     }
+    // Wait for the request to finish
+    int status;
+    result = waitDevice(USLOSS_DISK_DEV, unit, &status);
+    if (result != 0)
+    {
+        USLOSS_Console("diskSizeReal(): error: result of waitDevice was not 0: %d.\n", result);
+    }
+    if (status == USLOSS_DEV_ERROR)
+    {
+        USLOSS_Console("diskSizeReal(): error: the status of waitDevice is USLOSS_DEV_ERROR");
+    }
+
+
+    // Enable interrupts and tell parent that we're running
+    semvReal(running);
+    enableInterrupts();
 
     while (!isZapped())
     {
@@ -282,7 +296,11 @@ static int DiskDriver(char *arg)
             blockOnMbox();
             if(DEBUG4 && debugflag4)
             {
-                USLOSS_Console("DiskDriver(): Unblocked in the if loop.\n");
+                USLOSS_Console("DiskDriver(): Just unblocked.\n");
+            }
+            if(isZapped())
+            {
+                return 0;
             }
 
             // Once we've awoken, a request should exist
