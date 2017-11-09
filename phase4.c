@@ -203,7 +203,7 @@ int start3(char *args)
     zap(clockPID);
     for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
-        unblockProc(diskPIDs[i]);
+        semvReal(diskSem[i]);
         zap(diskPIDs[i]);
     }
     /*
@@ -316,6 +316,11 @@ static int DiskDriver(char *arg)
             USLOSS_Console("DiskDriver(%d): Calling semP on diskSem[%d]\n", unit, unit);
         }
         sempReal(diskSem[unit]);
+
+        if(isZapped())
+        {
+            break;
+        }
 
         // Dequeue a disk request
         if (DEBUG4 && debugflag4)

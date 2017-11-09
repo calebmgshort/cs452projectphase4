@@ -296,6 +296,7 @@ void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int 
     if(DEBUG4 && debugflag4)
     {
         USLOSS_Console("diskQueueAdd(): called.\n");
+        printQueue(unit);
     }
 
     processPtr proc = &ProcTable[getpid() % MAXPROC];
@@ -331,6 +332,10 @@ void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int 
         proc->nextDiskQueueProc = next;
     }
 
+    if(DEBUG4 && debugflag4)
+    {
+        printQueue(unit);
+    }
     returnMutex(diskMutex[unit]);
 
     semvReal(diskSem[unit]);
@@ -343,11 +348,20 @@ void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int 
 processPtr dequeueDiskRequest(int unit)
 {
     getMutex(diskMutex[unit]);
+    if(DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("diskQueueRequest(): called.\n");
+        printQueue(unit);
+    }
 
     // Return null when the queue is empty
     if (DiskDriverQueue[unit] == NULL)
     {
         returnMutex(diskMutex[unit]);
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("diskQueueRequest(): returning NULL.\n");
+        }
         return NULL;
     }
 
@@ -359,6 +373,10 @@ processPtr dequeueDiskRequest(int unit)
 
     // Get the request to dequeue and update
     processPtr ret = NextDiskRequest[unit];
+    if(DEBUG4 && debugflag4 && ret == NULL)
+    {
+        USLOSS_Console("diskQueueRequest(): ret is set to NULL.\n");
+    }
     NextDiskRequest[unit] = NextDiskRequest[unit]->nextDiskQueueProc;
 
     // Search for the parent of the request to dequeue and remove
@@ -385,6 +403,10 @@ processPtr dequeueDiskRequest(int unit)
 
     ret->nextDiskQueueProc = NULL;
 
+    if(DEBUG4 && debugflag4)
+    {
+        printQueue(unit);
+    }
     returnMutex(diskMutex[unit]);
 
     return ret;
@@ -477,9 +499,10 @@ void printQueue(int unit){
         USLOSS_Console("%d ", current->pid);
         current = current->nextDiskQueueProc;
     }
+    USLOSS_Console("\t\tNext: ");
     if(NextDiskRequest[unit] != NULL)
     {
-        USLOSS_Console("\t\tNext: %d", NextDiskRequest[unit]->pid);
+        USLOSS_Console("%d", NextDiskRequest[unit]->pid);
     }
     USLOSS_Console("\n");
 }
