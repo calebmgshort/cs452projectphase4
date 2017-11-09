@@ -15,7 +15,7 @@
 #include "phase4term.h"
 
 // Debugging flag
-int debugflag4 = 1;
+int debugflag4 = 0;
 
 // Semaphore used to create drivers
 semaphore running;
@@ -540,8 +540,18 @@ static int TermWriter(char *args)
 
         for (int i = 0; i < size; i++)
         {
+            if (DEBUG4 && debugflag4)
+            {
+                // USLOSS_Console("TermWriter(): %d: About to send character %c to driver.\n", unit, buffer[i]);
+            }
+
             // Send chars to the driver
-            sendPrivateMessage(diskPIDs[unit], buffer + i, sizeof(char));
+            sendPrivateMessage(termPIDs[unit], buffer + i, sizeof(char));
+
+            if (DEBUG4 && debugflag4)
+            {
+                // USLOSS_Console("TermWriter(): %d: Send completed.\n", unit);
+            }
 
             // Stop prematurely if we're zapped
             if (isZapped())
@@ -551,6 +561,10 @@ static int TermWriter(char *args)
         }
 
         // Unblock a proc once we've completed the line
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("TermWriter(): Write completed to term %d. Starting to unblock writer.\n", unit);
+        }
         int result = MboxCondSend(TermWriteWaitMbox[unit], NULL, 0);
         if (result == -2)
         {
@@ -561,7 +575,7 @@ static int TermWriter(char *args)
         {
             if (DEBUG4 && debugflag4)
             {
-                USLOSS_Console("TermWriter(): Write Completed to term %d. Process unblocked.\n", unit);
+                USLOSS_Console("TermWriter(): Process unblocked.\n", unit);
             }
         }
     }
