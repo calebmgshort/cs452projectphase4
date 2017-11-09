@@ -11,4 +11,5 @@ extern int termWriteReal(int, int, char *);
 
 extern void clearBuffer(termInputBuffer *);
 extern void storeChar(int, char);
+extern void awakenTerminal(int);
 #endif

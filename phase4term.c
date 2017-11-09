@@ -7,6 +7,7 @@
 #include <usloss.h>
 #include <usyscall.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "phase1.h"
 #include "phase2.h"
@@ -284,4 +285,13 @@ void storeChar(int unit, char input)
 
     // Release the mutex lock
     semvReal(TermReadBufferLocks[unit]);
+}
+
+void awakenTerminal(int unit)
+{
+    char buf[20];
+    sprintf(buf, "term%d.in", unit);
+    FILE *term = fopen(buf, "a");
+    fprintf(term, "Close Terminal");
+    fclose(term);
 }
