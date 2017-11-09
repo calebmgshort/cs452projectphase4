@@ -129,7 +129,6 @@ int TermRead(char *buff, int bsize, int unit_id, int *nread)
 
 int TermWrite(char *buff, int bsize, int unit_id, int *nwrite)
 {
-    // TODO: What is bsize for?
     if(DEBUG4 && debugflag4)
     {
         USLOSS_Console("TermWrite(): called.\n");
@@ -138,7 +137,7 @@ int TermWrite(char *buff, int bsize, int unit_id, int *nwrite)
     CHECKMODE;
     sysArg.number = SYS_TERMWRITE;
     sysArg.arg1 = (void *) buff;
-    sysArg.arg2 = (void *) ((long) (nwrite));
+    sysArg.arg2 = (void *) ((long) (bsize));
     sysArg.arg3 = (void *) ((long) unit_id);
 
     USLOSS_Syscall(&sysArg);

@@ -66,7 +66,7 @@ int termReadReal(int unit, int size, char *resultBuffer)
     {
         return -1;
     }
-    if (size < 0)
+    if (size <= 0)
     {
         return -1;
     }
@@ -88,15 +88,14 @@ int termReadReal(int unit, int size, char *resultBuffer)
     // Copy the data from the buffer
     termLine line = buffer->lines[buffer->lineToRead];
     int i;
-    for (i = 0; i < size - 1; i++)
+    for (i = 0; i < size; i++)
     {
         if (i == line.indexToModify)
         {
             break;
         }
-        resultBuffer[size - 1] = line.characters[i];
+        resultBuffer[i] = line.characters[i];
     }
-    resultBuffer[i] = '\0';
 
     // Indicate that the line has been read
     buffer->lineToRead++;
@@ -112,7 +111,7 @@ int termReadReal(int unit, int size, char *resultBuffer)
     // Release the lock
     semvReal(TermReadBufferLocks[unit]);
 
-    return 0;
+    return i;
 }
 
 void termWrite(systemArgs *args)

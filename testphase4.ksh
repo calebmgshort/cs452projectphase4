@@ -1,7 +1,8 @@
 #!/bin/ksh
-dir=/Users/Caleb/Documents/ComputerScience/csc452/project/phase4
+#dir=/Users/Caleb/Documents/ComputerScience/csc452/project/phase4
 #dir=/home/cs452/fall15/phase4/testResults
 #dir=/Users/patrick/Classes/452/project/phase4/testResults
+dir=./testResults
 
 if [ "$#" -eq 0 ]
 then
