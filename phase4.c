@@ -217,6 +217,10 @@ int start3(char *args)
             USLOSS_Console("start3(): Zapping term driver %d.\n", i);
         }
 
+        // Wake up the terminal, in case it's blocked on waitdevice
+        awakenTerminal(i);
+        
+        // zap it
         zap(termPIDs[i]);
 
 
