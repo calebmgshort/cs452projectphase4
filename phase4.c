@@ -19,6 +19,13 @@ int debugflag4 = 0;
 
 // Semaphore used to create drivers
 semaphore running;
+// Semaphore for the disks
+semaphore diskSem[USLOSS_DISK_UNITS];
+// Mutex for accessing the disk queue
+int diskMutex[USLOSS_DISK_UNITS];
+// Disk Queue stuff
+extern processPtr DiskDriverQueue[USLOSS_DISK_UNITS];
+extern processPtr NextDiskRequest[USLOSS_DISK_UNITS];
 
 // Driver process functions
 static int ClockDriver(char *);
@@ -118,7 +125,7 @@ int start3(char *args)
         // Wait for the driver to start
         sempReal(running);
     }
-
+    /*
     // Create terminal device processes
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
@@ -170,11 +177,11 @@ int start3(char *args)
             USLOSS_Console("start3(): Can't create term writer %d.\n", i);
             USLOSS_Halt(1);
         }
-        
+
         // Wait for the writer to start
         sempReal(running);
     }
-
+    */
     // Create first user-level process and wait for it to finish.
     if (DEBUG4 && debugflag4)
     {
@@ -196,9 +203,10 @@ int start3(char *args)
     zap(clockPID);
     for (int i = 0; i < USLOSS_DISK_UNITS; i++)
     {
-        unblockProc(diskPIDs[i]);
+        semvReal(diskSem[i]);
         zap(diskPIDs[i]);
     }
+    /*
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
         if (DEBUG4 && debugflag4)
@@ -233,7 +241,7 @@ int start3(char *args)
         // zap it
         zap(termWriterPIDs[i]);
     }
-
+    */
     // Quit
     quit(0);
     return 0;
@@ -290,7 +298,7 @@ static int DiskDriver(char *arg)
     int result = USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, &request);
     if (result != USLOSS_DEV_OK)
     {
-        USLOSS_Console("diskSizeReal(): Could not get number of tracks.\n");
+        USLOSS_Console("diskDriver(%d): Could not get number of tracks.\n", unit);
         USLOSS_Halt(1);
     }
     // Wait for the request to finish
@@ -298,13 +306,26 @@ static int DiskDriver(char *arg)
     result = waitDevice(USLOSS_DISK_DEV, unit, &status);
     if (result != 0)
     {
-        USLOSS_Console("diskSizeReal(): error: result of waitDevice was not 0: %d.\n", result);
+        USLOSS_Console("diskDriver(%d): error: result of waitDevice was not 0: %d.\n", unit, result);
     }
     if (status == USLOSS_DEV_ERROR)
     {
-        USLOSS_Console("diskSizeReal(): error: the status of waitDevice is USLOSS_DEV_ERROR");
+        USLOSS_Console("diskDriver(%d): error: the status of waitDevice is USLOSS_DEV_ERROR\n", unit);
     }
 
+    // Initialize the disk semaphore
+    diskSem[unit] = semcreateReal(0);
+
+    // Create the mutex for the disk queue
+    diskMutex[unit] = MboxCreate(1, 0);
+    if(diskMutex[unit] < 0){
+      USLOSS_Console("DiskDriver(%d): Failed to create the diskMutex.\n", unit);
+    }
+    returnMutex(diskMutex[unit]);
+
+    // Initialize the disk queue stuff
+    DiskDriverQueue[unit] = NULL;
+    NextDiskRequest[unit] = NULL;
 
     // Enable interrupts and tell parent that we're running
     semvReal(running);
@@ -312,34 +333,39 @@ static int DiskDriver(char *arg)
 
     while (!isZapped())
     {
-        // Dequeue a disk request
-        processPtr requestProc = dequeueDiskRequest();
-        if (requestProc == NULL)
+        if (DEBUG4 && debugflag4)
         {
-            if(DEBUG4 && debugflag4)
-            {
-                USLOSS_Console("DiskDriver(): There is nothing to do, blocking.\n");
-            }
-            // Block and wait for a request to come in
-            blockOnMbox();
-            if(DEBUG4 && debugflag4)
-            {
-                USLOSS_Console("DiskDriver(): Just unblocked.\n");
-            }
-            if(isZapped())
-            {
-                return 0;
-            }
-
-            // Once we've awoken, a request should exist
-            requestProc = dequeueDiskRequest();
-            if (requestProc == NULL)
-            {
-                USLOSS_Console("DiskDriver(): Awoken without a request.\n");
-                USLOSS_Halt(1);
-            }
+            USLOSS_Console("DiskDriver(%d): Now looking for another request to fulfill.\n", unit);
         }
 
+        // Make sure there is something on the queue
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("DiskDriver(%d): Calling semP on diskSem[%d]\n", unit, unit);
+        }
+        sempReal(diskSem[unit]);
+
+        if(isZapped())
+        {
+            break;
+        }
+
+        // Dequeue a disk request
+        if (DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("DiskDriver(%d): Now dequeueing a request\n", unit);
+        }
+        processPtr requestProc = dequeueDiskRequest(unit);
+        if (requestProc == NULL)
+        {
+            USLOSS_Console("DiskDriver(%d): Awoken without a request.\n", unit);
+            USLOSS_Halt(1);
+        }
+
+        if(DEBUG4 && debugflag4)
+        {
+            USLOSS_Console("DiskDriver(%d): Performing disk operation.\n", unit);
+        }
         // Perform the request
         performDiskOp(requestProc);
 
@@ -456,7 +482,7 @@ static int TermReader(char *args)
 
     // Get the associated unit number
     int unit = atoi(args);
-    
+
     // Initialize the buffers and semaphores
     clearBuffer(&TermReadBuffers[unit]);
     TermReadBufferLocks[unit] = semcreateReal(1);
@@ -502,7 +528,7 @@ static int TermWriter(char *args)
         char buffer[MAXLINE];
 
         // Receive a message from the mailbox
-        int size = MboxReceive(TermWriteMessageMbox[unit], buffer, MAXLINE); 
+        int size = MboxReceive(TermWriteMessageMbox[unit], buffer, MAXLINE);
         if (size == -3)
         {
             // We were zapped while waiting for a message
@@ -529,6 +555,6 @@ static int TermWriter(char *args)
             USLOSS_Halt(1);
         }
     }
-    
+
     return 0;
 }

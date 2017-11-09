@@ -75,6 +75,32 @@ void unblockByMbox(processPtr proc)
 }
 
 /*
+ *  Acquires the mutex with the given id
+ */
+void getMutex(int id)
+{
+    //USLOSS_Console("getMutex(): receiving from mailbox %d\n", id);
+    int result = MboxReceive(id, NULL, 0);
+    if(result == -1)
+    {
+        USLOSS_Console("getMutex(): receive called with invalid arguments\n");
+    }
+}
+
+/*
+ *  Returns the mutex with the given id
+ */
+void returnMutex(int id)
+{
+    //USLOSS_Console("returnMutex(): sending to mailbox %d\n", id);
+    int result = MboxSend(id, NULL, 0);
+    if(result == -1)
+    {
+        USLOSS_Console("returnMutex(): send called with invalid arguments\n");
+    }
+}
+
+/*
  * Receive a message from the current proc's private mailbox.
  */
 void receivePrivateMessage(void *msg, int size)
@@ -129,7 +155,18 @@ void clearProc(processPtr proc)
     proc->sleepTime = -1;
     proc->nextDiskQueueProc = NULL;
 
-    clearProcRequest(proc);    
+    clearProcRequest(proc);
+}
+
+void initProc()
+{
+    clearProc(getCurrentProc());
+    getCurrentProc()->pid = getpid();
+}
+
+processPtr getCurrentProc()
+{
+    return &ProcTable[getpid() % MAXPROC];
 }
 
 int compareRequests(diskRequest *req1, diskRequest *req2)

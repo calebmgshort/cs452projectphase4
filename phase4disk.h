@@ -13,7 +13,7 @@ extern int diskSizeReal(int, int *, int *, int *);
 
 extern int performDiskOp(processPtr);
 extern void diskQueueAdd(int, void*, int, int, int, int);
-extern processPtr dequeueDiskRequest();
+extern processPtr dequeueDiskRequest(int);
 extern int seekTrack(int, int);
 
 #endif
