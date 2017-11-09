@@ -15,7 +15,7 @@
 #include "phase4term.h"
 
 // Debugging flag
-int debugflag4 = 1;
+int debugflag4 = 0;
 
 // Semaphore used to create drivers
 semaphore running;
