@@ -1,8 +1,9 @@
 #!/bin/ksh
+dir=/Users/Caleb/Documents/ComputerScience/csc452/project/phase4
 #dir=/home/cs452/fall15/phase4/testResults
-dir=/Users/patrick/Classes/452/project/phase4/testResults
+#dir=/Users/patrick/Classes/452/project/phase4/testResults
 
-if [ "$#" -eq 0 ] 
+if [ "$#" -eq 0 ]
 then
     echo "Usage: ksh testphase4.ksh <num>"
     echo "where <num> is 00, 01, 02, ... or 26"
@@ -22,7 +23,7 @@ for i in 0 1 2 3; do
     cp testcases/term${i}.in.orig term${i}.in
 done
 
-if  make test${num} 
+if  make test${num}
 then
 
     ./test${num} > test${num}.txt 2> test${num}stderr.txt;
