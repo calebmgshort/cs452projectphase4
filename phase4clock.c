@@ -1,3 +1,9 @@
+/*
+ *  File: phase4clock.c
+ *  Purpose: This file holds functions and global variables that deal with the
+ *  clock device
+ */
+
 #include <stdlib.h>
 #include <usloss.h>
 #include <usyscall.h>
@@ -13,6 +19,9 @@ extern process ProcTable[];
 // List of processes waiting on the clock driver
 processPtr ClockDriverQueue = NULL;
 
+/*
+ *  System call for user function Sleep. Serves as a bridge between Sleep and sleepReal
+ */
 void sleep(systemArgs *args)
 {
     if(DEBUG4 && debugflag4)
@@ -40,6 +49,13 @@ void sleep(systemArgs *args)
     setToUserMode();
 }
 
+/*
+ *  Causes the calling process to become unrunnable for at least the specified
+ *  number of seconds, and not significantly longer. The seconds must be non-negative.
+ *  Return values:
+ *    -1: seconds is not valid
+ *     0: otherwise
+ */
 int sleepReal(int secs)
 {
     if(DEBUG4 && debugflag4)
@@ -113,6 +129,10 @@ void removeClockQueueProc()
     ClockDriverQueue = ClockDriverQueue->nextProc;
 }
 
+/*
+ *  Check the processes waiting on the clock queue and unblock those that have waited
+ *  long enough
+ */
 void checkClockQueue(int clockStatus)
 {
     // Iterate over the queue and check for procs to unblock

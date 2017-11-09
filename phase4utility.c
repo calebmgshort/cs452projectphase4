@@ -1,3 +1,8 @@
+/*
+ *  File: phase4utility.c
+ *  Purpose: This file holds utility functions used throughout this phase
+ */
+
 #include <usloss.h>
 #include <usyscall.h>
 #include <stdlib.h>
@@ -136,6 +141,9 @@ int sendPrivateMessageCond(int pid, void *msg, int size)
     return MboxCondSend(proc->privateMboxID, msg, size);
 }
 
+/*
+ *  Set the diskRequest struct values in this process to their default values
+ */
 void clearProcRequest(processPtr proc)
 {
     proc->diskRequest.op = EMPTY;
@@ -147,6 +155,9 @@ void clearProcRequest(processPtr proc)
     proc->diskRequest.resultStatus = 0;
 }
 
+/*
+ *  Set this process to its default values
+ */
 void clearProc(processPtr proc)
 {
     proc->pid = EMPTY;
@@ -158,17 +169,30 @@ void clearProc(processPtr proc)
     clearProcRequest(proc);
 }
 
+/*
+ *  Initialize the current process
+ */
 void initProc()
 {
     clearProc(getCurrentProc());
     getCurrentProc()->pid = getpid();
 }
 
+/*
+ *  Return the current process
+ */
 processPtr getCurrentProc()
 {
     return &ProcTable[getpid() % MAXPROC];
 }
 
+/*
+ *  A function used to insert disk requests in the correct order in the disk queue
+ *  Returns:
+ *    >0: req1 should go after req2 in the disk queue
+ *    <0: req1 should go before req2 in the disk queue
+ *     0: req1 and req2 are equivalent and should be adjacent in the queue
+ */
 int compareRequests(diskRequest *req1, diskRequest *req2)
 {
     if (req1->startTrack > req2->startTrack)

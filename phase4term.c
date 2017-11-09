@@ -1,3 +1,9 @@
+/*
+ *  File: phase4term.c
+ *  Purpose: This file holds functions and global variables that deal with the
+ *  terminal devices
+ */
+
 #include <usloss.h>
 #include <usyscall.h>
 #include <stdlib.h>
@@ -11,12 +17,17 @@
 
 extern int debugflag4;
 
+// Global terminal variables
 termInputBuffer TermReadBuffers[USLOSS_TERM_UNITS];
 semaphore TermReadBufferLocks[USLOSS_TERM_UNITS];
 int TermReadBufferWaitMbox[USLOSS_TERM_UNITS];
 int TermWriteWaitMbox[USLOSS_TERM_UNITS];
 int TermWriteMessageMbox[USLOSS_TERM_UNITS];
 
+/*
+ *  System call for user function TermRead. Serves as a bridge between TermRead
+ *  and termReadReal
+ */
 void termRead(systemArgs *args)
 {
     if (DEBUG4 && debugflag4)
@@ -35,10 +46,10 @@ void termRead(systemArgs *args)
     int unit = (int) ((long) args->arg3);
     int size = (int) ((long) args->arg2);
     char *buffer = (char *) args->arg1;
-    
+
     // Defer to termReadReal
     int result = termReadReal(unit, size, buffer);
-    
+
     // Pack up return values
     if (result == -1)
     {
@@ -55,6 +66,20 @@ void termRead(systemArgs *args)
     setToUserMode();
 }
 
+/*
+ *  This routine reads a line of text from the terminal indicated by unit into
+ *  the buffer pointed to by buffer. A line of text is terminated by a newline
+ *  character (‘\n’), which is copied into the buffer along with the other
+ *  characters in the line. If the length of a line of input is greater than the
+ *  value of the size parameter, then the first size characters are returned and
+ *  the rest discarded.
+ *  The terminal device driver should maintain a fixed-size buffer of 10 lines to
+ *  store characters read prior to an invocation of termRead (i.e. a read-ahead
+ *  buffer). Characters should be discarded if the read-ahead buffer overflows.
+ *  Return values:
+ *    -1: invalid parameters
+ *    >0: number of characters read
+ */
 int termReadReal(int unit, int size, char *resultBuffer)
 {
     if (DEBUG4 && debugflag4)
@@ -115,6 +140,10 @@ int termReadReal(int unit, int size, char *resultBuffer)
     return i;
 }
 
+/*
+ *  System call for user function TermWrite. Serves as a bridge between TermWrite
+ *  and termWriteReal
+ */
 void termWrite(systemArgs *args)
 {
     if (DEBUG4 && debugflag4)
@@ -153,6 +182,15 @@ void termWrite(systemArgs *args)
     setToUserMode();
 }
 
+/*
+ *  This routine writes size characters — a line of text pointed to by text to the
+ *  terminal indicated by unit. A newline is not automatically appended, so if one
+ *  is needed it must be included in the text to be written. This routine should not
+ *  return until the text has been written to the terminal.
+ *  Return values:
+ *    -1: invalid parameters
+ *    >0: number of characters written
+ */
 int termWriteReal(int unit, int size, char *text)
 {
     if (DEBUG4 && debugflag4)
@@ -223,7 +261,7 @@ void storeChar(int unit, char input)
     termLine *line = &buffer->lines[buffer->lineToModify];
     line->characters[line->indexToModify] = input;
     line->indexToModify++;
-    
+
     // If we've reached the end of the line, move to the next
     if (line->indexToModify == MAXLINE || input == '\n')
     {

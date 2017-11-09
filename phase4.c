@@ -1,3 +1,12 @@
+/*
+ *  File: phase4.c
+ *  Course: CSC 452, Fall 2017
+ *  Authors: Taylor Heimbichner and Caleb Short
+ *  Purpose: This file is phase 4 in the operating system, which handles requests
+ *    to the devices. This file specifically handles the device drivers and start3,
+ *    the entry and exit point to this phase.
+ */
+
 #include <usloss.h>
 #include <usyscall.h>
 #include <stdlib.h>
@@ -52,6 +61,10 @@ extern int TermReadBufferWaitMbox[];
 extern int TermWriteWaitMbox[];
 extern int TermWriteMessageMbox[];
 
+
+/*
+ *  The entry function for phase4. Starts and closes everything at the phase4 level
+ */
 int start3(char *args)
 {
     if (DEBUG4 && debugflag4)
@@ -228,19 +241,19 @@ int start3(char *args)
         // Unblock the reader, if it's waiting for a character
         char null = '\0';
         sendPrivateMessageCond(termReaderPIDs[i], &null, sizeof(char));
-        
+
         // zap it
         zap(termReaderPIDs[i]);
-        
+
 
         if (DEBUG4 && debugflag4)
         {
             USLOSS_Console("start3(): Zapping term writer %d.\n", i);
         }
-        
+
         // Unblock the writer, if it's waiting for input
         MboxCondSend(TermWriteMessageMbox[i], NULL, 0);
-        
+
         // zap it
         zap(termWriterPIDs[i]);
     }
@@ -476,6 +489,9 @@ static int TermDriver(char *arg)
     return 0;
 }
 
+/*
+ *  Process that handles reading from the terminal
+ */
 static int TermReader(char *args)
 {
     if (DEBUG4 && debugflag4)
@@ -507,6 +523,9 @@ static int TermReader(char *args)
     return 0;
 }
 
+/*
+ *  Process that handles writing to the terminal
+ */
 static int TermWriter(char *args)
 {
     if (DEBUG4 && debugflag4)

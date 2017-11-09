@@ -1,3 +1,9 @@
+/*
+ *  File: phase4disk.c
+ *  Purpose: This file holds functions and global variables that deal with the
+ *  disk devices
+ */
+
 #include <usloss.h>
 #include <usyscall.h>
 #include <stdlib.h>
@@ -25,6 +31,10 @@ processPtr NextDiskRequest[USLOSS_DISK_UNITS];
 // Disk sizes (number of tracks)
 int DiskSizes[USLOSS_DISK_UNITS];
 
+/*
+ *  System call for user function DiskRead. Serves as a bridge between DiskRead
+ *  and diskReadReal
+ */
 void diskRead(systemArgs *args)
 {
     if(DEBUG4 && debugflag4)
@@ -67,6 +77,16 @@ void diskRead(systemArgs *args)
     setToUserMode();
 }
 
+/*
+ *  Reads sectors sectors from the disk indicated by unit, starting at track track
+ *  and sector first. The sectors are copied into buffer. Your driver must handle
+ *  a range of sectors specified by first and sectors that spans a track boundary
+ *  (after reading the last sector in a track it should read the first sector in
+ *  the next track). A file cannot wrap around the end of the disk.
+ *  Return values:
+ *    -1: invalid parameters
+ *     0: sectors were read successfully >0: disk’s status register
+ */
 int diskReadReal(void* memoryAddress, int numSectors, int startDiskTrack,
                  int startDiskSector, int unitNum)
 {
@@ -127,6 +147,10 @@ int diskReadReal(void* memoryAddress, int numSectors, int startDiskTrack,
     return status;
 }
 
+/*
+ *  System call for user function DiskWrite. Serves as a bridge between DiskWrite
+ *  and diskWriteReal
+ */
 void diskWrite(systemArgs *args)
 {
     if(DEBUG4 && debugflag4)
@@ -168,6 +192,15 @@ void diskWrite(systemArgs *args)
     setToUserMode();
 }
 
+/*
+ *  Writes sectors sectors to the disk indicated by unit, starting at track track
+ *  and sector first. The contents of the sectors are read from buffer. Like diskRead,
+ *  your driver must handle a range of sectors specified by first and sectors that
+ *  spans a track boundary. A file cannot wrap around the end of the disk.
+ *  Return values:
+ *    -1: invalid parameters
+ *     0: sectors were written successfully >0: disk’s status register
+ */
 int diskWriteReal(void* memoryAddress, int numSectors, int startDiskTrack,
                  int startDiskSector, int unitNum)
 {
@@ -236,6 +269,10 @@ int diskWriteReal(void* memoryAddress, int numSectors, int startDiskTrack,
     return status;
 }
 
+/*
+ *  System call for user function DiskSize. Serves as a bridge between DiskSize
+ *  and diskSizeReal
+ */
 void diskSize(systemArgs *args)
 {
     if(DEBUG4 && debugflag4)
@@ -270,6 +307,14 @@ void diskSize(systemArgs *args)
     setToUserMode();
 }
 
+/*
+ *  Returns information about the size of the disk indicated by unit. The sector
+ *  parameter is filled in with the number of bytes in a sector, track with the
+ *  number of sectors in a track, and disk with the number of tracks in the disk.
+ *  Return values:
+ *    -1: invalid parameters
+ *     0: disk size parameters returned successfully
+ */
 int diskSizeReal(int unit, int *sector, int *track, int *disk)
 {
     if(DEBUG4 && debugflag4)
@@ -290,6 +335,9 @@ int diskSizeReal(int unit, int *sector, int *track, int *disk)
     return 0;
 }
 
+/*
+ * Initialize the current process with a request and add it to the disk queue
+ */
 void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int startSector, int unit)
 {
     getMutex(diskMutex[unit]);
@@ -412,6 +460,9 @@ processPtr dequeueDiskRequest(int unit)
     return ret;
 }
 
+/*
+ *  Perform a disk operation as defined in the request struct in processPtr proc
+ */
 int performDiskOp(processPtr proc)
 {
     diskRequest request = proc->diskRequest;
@@ -474,6 +525,9 @@ int performDiskOp(processPtr proc)
     return 0;
 }
 
+/*
+ *  A utility function to seek to the given track
+ */
 int seekTrack(int unit, int track)
 {
     // Send the disk a seek request
@@ -492,6 +546,9 @@ int seekTrack(int unit, int track)
     return waitDevice(USLOSS_DISK_DEV, unit, &status);
 }
 
+/*
+ *  A debugging function that prints the current disk queue and next disk request
+ */
 void printQueue(int unit){
     USLOSS_Console("Printing the disk queue for unit %d\nQueue: ", unit);
     processPtr current = DiskDriverQueue[unit];
