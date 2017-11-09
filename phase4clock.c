@@ -140,6 +140,7 @@ void checkClockQueue(int clockStatus)
     processPtr parent = NULL;
     while (proc != NULL)
     {
+        processPtr nextProc = proc->nextProc;
         if (proc->blockStartTime == -1)
         {
             proc->blockStartTime = clockStatus;
@@ -163,6 +164,6 @@ void checkClockQueue(int clockStatus)
         }
         // Step through the queue
         parent = proc;
-        proc = proc->nextProc;
+        proc = nextProc;
     }
 }

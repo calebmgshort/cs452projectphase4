@@ -1,7 +1,7 @@
-#PREFIX = /home/theimbichner/Csc452Project/
-#LDFLAGS += -L. -L./libraries/linux -L${PREFIX}/lib
-PREFIX = /Users/Caleb/Documents/ComputerScience/csc452/project/compilefolder#${HOME}
-LDFLAGS += -L. -L./libraries/osx -L${PREFIX}/lib
+PREFIX = /home/theimbichner/Csc452Project/
+LDFLAGS += -L. -L./libraries/linux -L${PREFIX}/lib
+#PREFIX = /Users/Caleb/Documents/ComputerScience/csc452/project/compilefolder#${HOME}
+#LDFLAGS += -L. -L./libraries/osx -L${PREFIX}/lib
 
 TARGET = libphase4.a
 ASSIGNMENT = 452phase4
