@@ -72,7 +72,7 @@ int sleepReal(int secs)
     addProcToClockQueue(&ProcTable[getpid() % MAXPROC]);
 
     // Set the sleep time in the process table
-    ProcTable[getpid() % MAXPROC].sleepTime = secs;
+    ProcTable[getpid() % MAXPROC].sleepTime = secs * 10;
 
     if (DEBUG4 && debugflag4)
     {
@@ -117,19 +117,6 @@ processPtr nextClockQueueProc()
 }
 
 /*
- * Removes one process from the ClockDriverQueue. If there are no processes in
- * the queue, then no action is taken.
- */
-void removeClockQueueProc()
-{
-    if (ClockDriverQueue == NULL)
-    {
-        return;
-    }
-    ClockDriverQueue = ClockDriverQueue->nextProc;
-}
-
-/*
  *  Check the processes waiting on the clock queue and unblock those that have waited
  *  long enough
  */
@@ -145,8 +132,7 @@ void checkClockQueue(int clockStatus)
         {
             proc->blockStartTime = clockStatus;
         }
-        int mcsPassed = (clockStatus - proc->blockStartTime);
-        if (mcsPassed > 1000000 * proc->sleepTime)
+        if (proc->sleepTime == 0)
         {
             // Enough time has elapsed; unblock proc
             proc->sleepTime = -1;
@@ -161,6 +147,10 @@ void checkClockQueue(int clockStatus)
             }
             proc->nextProc = NULL;
             unblockByMbox(proc);
+        }
+        else
+        {
+            proc->sleepTime--;
         }
         // Step through the queue
         parent = proc;
