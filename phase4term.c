@@ -2,6 +2,7 @@
 #include <usyscall.h>
 #include <stdlib.h>
 
+#include "phase1.h"
 #include "phase2.h"
 #include "providedPrototypes.h"
 #include "devices.h"
@@ -172,8 +173,18 @@ int termWriteReal(int unit, int size, char *text)
     // Send the text to the mailbox
     MboxSend(TermWriteMessageMbox[unit], text, size);
 
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("termWriteReal(): About to block pid %d after write to terminal %d.\n", getpid(), unit);
+    }
+
     // Once the text has been sent, wait for the writing to complete
     MboxReceive(TermWriteWaitMbox[unit], NULL, 0);
+
+    if (DEBUG4 && debugflag4)
+    {
+        USLOSS_Console("termWriteReal(): Pid %d unblocked.\n", getpid());
+    }
 
     return size;
 }
