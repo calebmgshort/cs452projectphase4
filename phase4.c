@@ -15,14 +15,17 @@
 #include "phase4term.h"
 
 // Debugging flag
-int debugflag4 = 0;
+int debugflag4 = 1;
 
 // Semaphore used to create drivers
 semaphore running;
+
 // Semaphore for the disks
 semaphore diskSem[USLOSS_DISK_UNITS];
+
 // Mutex for accessing the disk queue
 int diskMutex[USLOSS_DISK_UNITS];
+
 // Disk Queue stuff
 extern processPtr DiskDriverQueue[USLOSS_DISK_UNITS];
 extern processPtr NextDiskRequest[USLOSS_DISK_UNITS];
@@ -88,6 +91,7 @@ int start3(char *args)
         proc->privateMboxID = MboxCreate(0, MAX_MESSAGE);
     }
 
+    // Create the running semaphore
     running = semcreateReal(0);
 
     // Create clock device driver
@@ -125,7 +129,7 @@ int start3(char *args)
         // Wait for the driver to start
         sempReal(running);
     }
-    /*
+
     // Create terminal device processes
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
@@ -181,7 +185,7 @@ int start3(char *args)
         // Wait for the writer to start
         sempReal(running);
     }
-    */
+
     // Create first user-level process and wait for it to finish.
     if (DEBUG4 && debugflag4)
     {
@@ -206,7 +210,6 @@ int start3(char *args)
         semvReal(diskSem[i]);
         zap(diskPIDs[i]);
     }
-    /*
     for (int i = 0; i < USLOSS_TERM_UNITS; i++)
     {
         if (DEBUG4 && debugflag4)
@@ -241,7 +244,7 @@ int start3(char *args)
         // zap it
         zap(termWriterPIDs[i]);
     }
-    */
+
     // Quit
     quit(0);
     return 0;
@@ -553,6 +556,13 @@ static int TermWriter(char *args)
         {
             USLOSS_Console("TermWriter(): Process that wrote to terminal was not blocked.\n");
             USLOSS_Halt(1);
+        }
+        else if (result == 0)
+        {
+            if (DEBUG4 && debugflag4)
+            {
+                USLOSS_Console("TermWriter(): Write Completed to term %d. Process unblocked.\n", unit);
+            }
         }
     }
 
