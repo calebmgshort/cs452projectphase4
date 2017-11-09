@@ -296,9 +296,7 @@ void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int 
     if(DEBUG4 && debugflag4)
     {
         USLOSS_Console("diskQueueAdd(): called.\n");
-        printQueue(unit);
     }
-    printQueue(unit);
 
     processPtr proc = &ProcTable[getpid() % MAXPROC];
     diskRequest *request = &proc->diskRequest;
@@ -333,10 +331,8 @@ void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int 
         proc->nextDiskQueueProc = next;
     }
 
-    printQueue(unit);
     returnMutex(diskMutex[unit]);
 
-    USLOSS_Console("Calling semV on diskSem[%d]\n", unit);
     semvReal(diskSem[unit]);
 }
 
@@ -347,19 +343,11 @@ void diskQueueAdd(int op, void *memAddress, int numSectors, int startTrack, int 
 processPtr dequeueDiskRequest(int unit)
 {
     getMutex(diskMutex[unit]);
-    if(DEBUG4 && debugflag4)
-    {
-        USLOSS_Console("dequeueDiskRequest(): called.\n");
-        printQueue(unit);
-    }
-    USLOSS_Console("dequeueDiskRequest(%d): obtaining the mutex\n", unit);
 
     // Return null when the queue is empty
     if (DiskDriverQueue[unit] == NULL)
     {
-        USLOSS_Console("dequeueDiskRequest(%d): returing the mutex\n", unit);
         returnMutex(diskMutex[unit]);
-        USLOSS_Console("dequeueDiskRequest(%d): returned the mutex\n", unit);
         return NULL;
     }
 
@@ -369,30 +357,18 @@ processPtr dequeueDiskRequest(int unit)
         NextDiskRequest[unit] = DiskDriverQueue[unit];
     }
 
-    USLOSS_Console("dequeueDiskRequest(%d): one\n", unit);
-
     // Get the request to dequeue and update
     processPtr ret = NextDiskRequest[unit];
     NextDiskRequest[unit] = NextDiskRequest[unit]->nextDiskQueueProc;
-    if (NextDiskRequest[unit] == NULL)
-    {
-        NextDiskRequest[unit] = DiskDriverQueue[unit];
-    }
-
-    USLOSS_Console("dequeueDiskRequest(%d): two\n", unit);
 
     // Search for the parent of the request to dequeue and remove
     if (ret != DiskDriverQueue[unit])
     {
-        USLOSS_Console("dequeueDiskRequest(%d): two.one\n", unit);
         processPtr parent = DiskDriverQueue[unit];
-        printQueue(unit);
         while (parent->nextDiskQueueProc != ret)
         {
-            USLOSS_Console("dequeueDiskRequest(%d): parent pid = %d\n", unit, parent->pid);
             parent = parent->nextDiskQueueProc;
         }
-        USLOSS_Console("dequeueDiskRequest(%d): two.two\n", unit);
 
         // Remove ret
         parent->nextDiskQueueProc = ret->nextDiskQueueProc;
@@ -402,13 +378,14 @@ processPtr dequeueDiskRequest(int unit)
         DiskDriverQueue[unit] = ret->nextDiskQueueProc;
     }
 
-    USLOSS_Console("dequeueDiskRequest(%d): three\n", unit);
+    if (NextDiskRequest[unit] == NULL)
+    {
+        NextDiskRequest[unit] = DiskDriverQueue[unit];
+    }
 
     ret->nextDiskQueueProc = NULL;
 
-    USLOSS_Console("dequeueDiskRequest(%d): returing the mutex\n", unit);
     returnMutex(diskMutex[unit]);
-    USLOSS_Console("dequeueDiskRequest(%d): returned the mutex\n", unit);
 
     return ret;
 }
@@ -494,10 +471,15 @@ int seekTrack(int unit, int track)
 }
 
 void printQueue(int unit){
-    USLOSS_Console("Printing the disk queue for unit %d\n", unit);
+    USLOSS_Console("Printing the disk queue for unit %d\nQueue: ", unit);
     processPtr current = DiskDriverQueue[unit];
     while(current != NULL){
         USLOSS_Console("%d ", current->pid);
+        current = current->nextDiskQueueProc;
     }
-    USLOSS_Console("\t\t%d", NextDiskRequest[unit]->pid);
+    if(NextDiskRequest[unit] != NULL)
+    {
+        USLOSS_Console("\t\tNext: %d", NextDiskRequest[unit]->pid);
+    }
+    USLOSS_Console("\n");
 }

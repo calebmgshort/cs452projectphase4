@@ -15,7 +15,7 @@
 #include "phase4term.h"
 
 // Debugging flag
-int debugflag4 = 1;
+int debugflag4 = 0;
 
 // Semaphore used to create drivers
 semaphore running;
@@ -293,7 +293,6 @@ static int DiskDriver(char *arg)
     if(diskMutex[unit] < 0){
       USLOSS_Console("DiskDriver(%d): Failed to create the diskMutex.\n", unit);
     }
-    USLOSS_Console("diskDriver(%d): got mutex of id %d\n", unit, diskMutex[unit]);
     returnMutex(diskMutex[unit]);
 
     // Initialize the disk queue stuff
