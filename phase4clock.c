@@ -109,14 +109,6 @@ void addProcToClockQueue(processPtr proc)
 }
 
 /*
- * Returns the head of the ClockDriverQueue.
- */
-processPtr nextClockQueueProc()
-{
-    return ClockDriverQueue;
-}
-
-/*
  *  Check the processes waiting on the clock queue and unblock those that have waited
  *  long enough
  */

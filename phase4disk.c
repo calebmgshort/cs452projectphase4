@@ -140,7 +140,7 @@ int diskReadReal(void* memoryAddress, int numSectors, int startDiskTrack,
 
     // Put this into the disk driver queue and block
     diskQueueAdd(DISK_READ, memoryAddress, numSectors, startDiskTrack, startDiskSector, unitNum);
-    blockOnMbox();  // TODO: We still need to unblock this proc after it's finished on the queue
+    blockOnMbox(); 
     processPtr proc = &ProcTable[getpid() % MAXPROC];
     int status = proc->diskRequest.resultStatus;
     clearProc(proc);

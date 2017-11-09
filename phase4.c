@@ -277,6 +277,9 @@ static int ClockDriver(char *arg)
         USLOSS_Console("ClockDriver(): called.\n");
     }
 
+    // Ensure that we are in kernel mode
+    checkMode("ClockDriver");
+
     // Let the parent know we are running and enable interrupts.
     semvReal(running);
     enableInterrupts();
@@ -308,6 +311,9 @@ static int DiskDriver(char *arg)
         USLOSS_Console("DiskDriver(): called.\n");
     }
 
+    // Ensure that we are in kernel mode
+    checkMode("DiskDriver");
+
     // Find the unit number
     int unit = atoi(arg);
 
@@ -338,8 +344,9 @@ static int DiskDriver(char *arg)
 
     // Create the mutex for the disk queue
     diskMutex[unit] = MboxCreate(1, 0);
-    if(diskMutex[unit] < 0){
-      USLOSS_Console("DiskDriver(%d): Failed to create the diskMutex.\n", unit);
+    if (diskMutex[unit] < 0)
+    {
+        USLOSS_Console("DiskDriver(%d): Failed to create the diskMutex.\n", unit);
     }
     returnMutex(diskMutex[unit]);
 
@@ -386,6 +393,7 @@ static int DiskDriver(char *arg)
         {
             USLOSS_Console("DiskDriver(%d): Performing disk operation.\n", unit);
         }
+
         // Perform the request
         performDiskOp(requestProc);
 
@@ -404,6 +412,9 @@ static int TermDriver(char *arg)
     {
         USLOSS_Console("TermDriver(): called.\n");
     }
+
+    // Ensure that we are in kernel mode
+    checkMode("TermDriver");
 
     // Enable interrupts and tell parent that we're running
     semvReal(running);
@@ -503,6 +514,9 @@ static int TermReader(char *args)
         USLOSS_Console("TermRead(): Called.\n");
     }
 
+    // Ensure that we are in kernel mode
+    checkMode("TermReader");
+
     // Get the associated unit number
     int unit = atoi(args);
 
@@ -536,6 +550,9 @@ static int TermWriter(char *args)
     {
         USLOSS_Console("TermWrite(): Called.\n");
     }
+
+    // Ensure that we are in kernel mode
+    checkMode("TermWriter");
 
     // Get the associated unit number
     int unit = atoi(args);
