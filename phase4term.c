@@ -287,11 +287,14 @@ void storeChar(int unit, char input)
     semvReal(TermReadBufferLocks[unit]);
 }
 
+/*
+ * Modifies the input file for the given terminal, causing an interrupt.
+ */
 void awakenTerminal(int unit)
 {
     char buf[20];
     sprintf(buf, "term%d.in", unit);
     FILE *term = fopen(buf, "a");
-    fprintf(term, "Close Terminal");
+    fprintf(term, "Close Terminal\n");
     fclose(term);
 }
